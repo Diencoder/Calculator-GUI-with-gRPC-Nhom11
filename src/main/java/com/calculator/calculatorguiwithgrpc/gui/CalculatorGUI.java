@@ -224,6 +224,10 @@ public class CalculatorGUI extends Application {
         firstOperand = Double.parseDouble(currentInput);
         operator = convertOperatorSymbol(op);
         waitingForOperand = true;
+        
+        // Display the operator on screen
+        currentInput = op;
+        updateDisplay();
     }
     
     /**
@@ -256,6 +260,7 @@ public class CalculatorGUI extends Application {
             
             if (result.isSuccess()) {
                 currentInput = formatResult(result.getResult());
+                logger.info("Formatted result: {}", currentInput);
                 operator = "";
                 waitingForOperand = true;
                 updateDisplay();
@@ -300,7 +305,9 @@ public class CalculatorGUI extends Application {
      * Update display
      */
     private void updateDisplay() {
+        logger.info("Updating display with: {}", currentInput);
         displayField.setText(currentInput);
+        logger.info("Display field text after update: {}", displayField.getText());
     }
     
     /**
@@ -325,7 +332,10 @@ public class CalculatorGUI extends Application {
      * Check if text is an operator
      */
     private boolean isOperator(String text) {
-        return validationUtils.isValidOperator(convertOperatorSymbol(text));
+        String convertedSymbol = convertOperatorSymbol(text);
+        boolean isValid = validationUtils.isValidOperator(convertedSymbol);
+        logger.info("Checking operator: '{}' -> '{}' -> {}", text, convertedSymbol, isValid);
+        return isValid;
     }
     
     /**

@@ -27,6 +27,21 @@ public class AdvancedCalculatorService extends CalculatorServiceGrpc.CalculatorS
     }
     
     @Override
+    public void healthCheck(HealthCheckRequest request, StreamObserver<HealthCheckResponse> responseObserver) {
+        logger.info("Health check request received for service: {}", request.getService());
+        
+        HealthCheckResponse response = HealthCheckResponse.newBuilder()
+                .setStatus(HealthCheckResponse.ServingStatus.SERVING)
+                .setMessage("Calculator service is healthy and ready")
+                .build();
+        
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+        
+        logger.info("Health check completed successfully");
+    }
+    
+    @Override
     public void calculate(CalculationRequest request, StreamObserver<CalculationResponse> responseObserver) {
         logger.info("Advanced calculation request: {} {} {}", request.getOperand1(), request.getOperator(), request.getOperand2());
         
