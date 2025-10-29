@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.calculator.calculatorguiwithgrpc.gui.CalculatorController">
+   <top>
+      <VBox alignment="CENTER" spacing="10.0">
+         <children>
+            <Label text="Calculator GUI with gRPC" textFill="#2c3e50">
+               <font>
+                  <Font name="Arial Bold" size="24.0" />
+               </font>
+            </Label>
+            <TextField fx:id="displayField" editable="false" prefHeight="60.0" style="-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-width: 2; -fx-font-size: 20; -fx-font-weight: bold;" text="0" />
+            <ToggleButton fx:id="modeToggle" onAction="#handleModeToggle" text="Basic Mode" />
+         </children>
+         <padding>
+            <Insets bottom="10.0" left="20.0" right="20.0" top="20.0" />
+         </padding>
+      </VBox>
+   </top>
+   <center>
+      <VBox alignment="CENTER" spacing="10.0">
+         <children>
+            <GridPane hgap="10.0" vgap="10.0">
+               <columnConstraints>
+                  <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+                  <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+                  <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+                  <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+               </columnConstraints>
+               <rowConstraints>
+                  <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+               </rowConstraints>
+               <children>
+                  <!-- Row 1: C, ±, %, ÷ -->
+                  <Button fx:id="clearButton" onAction="#handleClear" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-weight: bold;" text="C" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                  <Button fx:id="signButton" onAction="#handleSignChange" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-weight: bold;" text="±" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                  <Button fx:id="percentButton" onAction="#handleOperator" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;" text="%" GridPane.columnIndex="2" GridPane.rowIndex="0" />
+                  <Button fx:id="divideButton" onAction="#handleOperator" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;" text="÷" GridPane.columnIndex="3" GridPane.rowIndex="0" />
+                  
+                  <!-- Row 2: 7, 8, 9, × -->
+                  <Button fx:id="sevenButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="7" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                  <Button fx:id="eightButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="8" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                  <Button fx:id="nineButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="9" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                  <Button fx:id="multiplyButton" onAction="#handleOperator" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;" text="×" GridPane.columnIndex="3" GridPane.rowIndex="1" />
+                  
+                  <!-- Row 3: 4, 5, 6, - -->
+                  <Button fx:id="fourButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="4" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                  <Button fx:id="fiveButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="5" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                  <Button fx:id="sixButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="6" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                  <Button fx:id="subtractButton" onAction="#handleOperator" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;" text="-" GridPane.columnIndex="3" GridPane.rowIndex="2" />
+                  
+                  <!-- Row 4: 1, 2, 3, + -->
+                  <Button fx:id="oneButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="1" GridPane.columnIndex="0" GridPane.rowIndex="3" />
+                  <Button fx:id="twoButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="2" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                  <Button fx:id="threeButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="3" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+                  <Button fx:id="addButton" onAction="#handleOperator" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;" text="+" GridPane.columnIndex="3" GridPane.rowIndex="3" />
+                  
+                  <!-- Row 5: 0, ., = -->
+                  <Button fx:id="zeroButton" onAction="#handleNumber" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="0" GridPane.columnIndex="0" GridPane.rowIndex="4" />
+                  <Button fx:id="decimalButton" onAction="#handleDecimal" prefHeight="50.0" prefWidth="70.0" style="-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7;" text="." GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                  <Button fx:id="equalsButton" onAction="#handleEquals" prefHeight="50.0" prefWidth="150.0" style="-fx-background-color: #f39c12; -fx-text-fill: white; -fx-font-weight: bold;" text="=" GridPane.columnIndex="2" GridPane.columnSpan="2" GridPane.rowIndex="4" />
+               </children>
+            </GridPane>
+         </children>
+         <padding>
+            <Insets bottom="20.0" left="20.0" right="20.0" top="10.0" />
+         </padding>
+      </VBox>
+   </center>
+   <bottom>
+      <VBox alignment="CENTER" spacing="5.0">
+         <children>
+            <Label fx:id="statusLabel" text="Ready" textFill="#7f8c8d">
+               <font>
+                  <Font name="Arial" size="12.0" />
+               </font>
+            </Label>
+         </children>
+         <padding>
+            <Insets bottom="10.0" left="20.0" right="20.0" top="10.0" />
+         </padding>
+      </VBox>
+   </bottom>
+</BorderPane>

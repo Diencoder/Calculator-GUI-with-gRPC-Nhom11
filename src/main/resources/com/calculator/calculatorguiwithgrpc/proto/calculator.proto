@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package calculator;
+
+option java_package = "com.calculator.calculatorguiwithgrpc.proto";
+option java_outer_classname = "CalculatorProtos";
+
+// Service definition for Calculator
+service CalculatorService {
+  // Basic calculation method
+  rpc Calculate(CalculationRequest) returns (CalculationResponse);
+  
+  // Stream calculation for real-time processing
+  rpc StreamCalculate(stream CalculationRequest) returns (stream CalculationResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Request message for calculation
+message CalculationRequest {
+  double operand1 = 1;
+  double operand2 = 2;
+  string operator = 3;
+  string request_id = 4;  // For tracking requests
+}
+
+// Response message for calculation
+message CalculationResponse {
+  double result = 1;
+  bool success = 2;
+  string error_message = 3;
+  string request_id = 4;  // For tracking responses
+  int64 timestamp = 5;    // Response timestamp
+}
+
+// Health check request
+message HealthCheckRequest {
+  string service = 1;
+}
+
+// Health check response
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+  }
+  ServingStatus status = 1;
+  string message = 2;
+}
