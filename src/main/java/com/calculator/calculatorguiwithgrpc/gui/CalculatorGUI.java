@@ -255,9 +255,11 @@ public class CalculatorGUI extends Application {
             double secondOperand = Double.parseDouble(currentInput);
             String currentOperator = operator; // Store operator before reset
             
-            // Perform calculation using gRPC
-            CalculatorClient.CalculationResult result = calculatorClient.calculate(firstOperand, secondOperand, operator);
-            
+
+            // Thực hiện phép tính sử dụng gRPC
+            CalculatorClient.CalculationResult result = calculatorClient.performCalculation(firstOperand, secondOperand, operator);
+
+
             if (result.isSuccess()) {
                 currentInput = formatResult(result.getResult());
                 logger.info("Formatted result: {}", currentInput);
