@@ -14,38 +14,41 @@ import java.util.ResourceBundle;
 /**
  * Controller for Calculator FXML
  * Handles UI events and interactions
- * 
+ *
  * @author Calculator Team
  * @version 1.0
  */
 public class CalculatorController implements Initializable {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(CalculatorController.class);
-    
+
     // FXML injected components
     @FXML private TextField displayField;
     @FXML private ToggleButton modeToggle;
     @FXML private Label statusLabel;
-    
+    @FXML private ListView<String> historyListView;
+    @FXML private Button clearHistoryButton; // Thêm nút xóa lịch sử
+
     // Calculator components
     private CalculatorClient calculatorClient;
     private ValidationUtils validationUtils;
-    
+
     // Calculator state
     private String currentInput = "0";
     private String operator = "";
     private double firstOperand = 0;
     private boolean waitingForOperand = false;
     private boolean advancedMode = false;
-    
+    private java.util.List<String> calculationHistory = new java.util.ArrayList<>();
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         logger.info("Initializing Calculator Controller");
-        
+
         // Initialize components
         calculatorClient = new CalculatorClient();
         validationUtils = new ValidationUtils();
-        
+
         // Check server health
         if (!calculatorClient.isServerHealthy()) {
             updateStatus("Server Error - Check connection");
@@ -53,11 +56,13 @@ public class CalculatorController implements Initializable {
         } else {
             updateStatus("Ready");
         }
-        
+
         // Setup display
         displayField.setText(currentInput);
+        historyListView.setItems(javafx.collections.FXCollections.observableArrayList(calculationHistory));
+        clearHistoryButton.setOnAction(e -> clearHistory()); // Liên kết hành động xóa lịch sử
     }
-    
+
     /**
      * Handle number button clicks
      */
@@ -65,19 +70,19 @@ public class CalculatorController implements Initializable {
     private void handleNumber(javafx.event.ActionEvent event) {
         Button button = (Button) event.getSource();
         String number = button.getText();
-        
+
         logger.info("Number button clicked: {}", number);
-        
+
         if (waitingForOperand) {
             currentInput = number;
             waitingForOperand = false;
         } else {
             currentInput = currentInput.equals("0") ? number : currentInput + number;
         }
-        
+
         updateDisplay();
     }
-    
+
     /**
      * Handle operator button clicks
      */
@@ -85,16 +90,16 @@ public class CalculatorController implements Initializable {
     private void handleOperator(javafx.event.ActionEvent event) {
         Button button = (Button) event.getSource();
         String op = button.getText();
-        
+
         logger.info("Operator button clicked: {}", op);
-        
+
         // Convert display operator to gRPC operator
         String grpcOperator = convertToGrpcOperator(op);
-        
+
         if (!operator.isEmpty() && !waitingForOperand) {
             handleEquals();
         }
-        
+
         try {
             firstOperand = Double.parseDouble(currentInput);
             operator = grpcOperator;
@@ -105,24 +110,24 @@ public class CalculatorController implements Initializable {
             updateStatus("Invalid input");
         }
     }
-    
+
     /**
      * Handle decimal button click
      */
     @FXML
     private void handleDecimal(javafx.event.ActionEvent event) {
         logger.info("Decimal button clicked");
-        
+
         if (waitingForOperand) {
             currentInput = "0.";
             waitingForOperand = false;
         } else if (!currentInput.contains(".")) {
             currentInput += ".";
         }
-        
+
         updateDisplay();
     }
-    
+
     /**
      * Handle equals button click
      */
@@ -130,7 +135,7 @@ public class CalculatorController implements Initializable {
     private void handleEquals(javafx.event.ActionEvent event) {
         handleEquals();
     }
-    
+
     /**
      * Handle equals calculation
      */
@@ -138,21 +143,23 @@ public class CalculatorController implements Initializable {
         if (operator.isEmpty() || waitingForOperand) {
             return;
         }
-        
+
         try {
             double secondOperand = Double.parseDouble(currentInput);
-            
+
             logger.info("Performing calculation: {} {} {}", firstOperand, operator, secondOperand);
             updateStatus("Calculating...");
-            
+
             // Perform calculation using gRPC
             CalculatorClient.CalculationResult result = calculatorClient.calculate(firstOperand, secondOperand, operator);
-            
+
             if (result.isSuccess()) {
                 currentInput = formatResult(result.getResult());
                 operator = "";
                 waitingForOperand = true;
                 updateDisplay();
+                calculationHistory.add(firstOperand + " " + operator + " " + secondOperand + " = " + currentInput);
+                historyListView.setItems(javafx.collections.FXCollections.observableArrayList(calculationHistory));
                 updateStatus("Ready");
                 logger.info("Calculation successful: {} {} {} = {}", firstOperand, operator, secondOperand, result.getResult());
             } else {
@@ -160,14 +167,14 @@ public class CalculatorController implements Initializable {
                 updateStatus("Error");
                 logger.error("Calculation failed: {}", result.getErrorMessage());
             }
-            
+
         } catch (NumberFormatException e) {
             showAlert("Input Error", "Invalid number format");
             updateStatus("Error");
             logger.error("Invalid number format", e);
         }
     }
-    
+
     /**
      * Handle clear button click
      */
@@ -175,7 +182,7 @@ public class CalculatorController implements Initializable {
     private void handleClear(javafx.event.ActionEvent event) {
         clearAll();
     }
-    
+
     /**
      * Clear all calculator state
      */
@@ -185,17 +192,29 @@ public class CalculatorController implements Initializable {
         operator = "";
         firstOperand = 0;
         waitingForOperand = false;
+        calculationHistory.clear();
+        historyListView.setItems(javafx.collections.FXCollections.observableArrayList(calculationHistory));
         updateDisplay();
         updateStatus("Ready");
     }
-    
+
+    /**
+     * Clear history only
+     */
+    private void clearHistory() {
+        logger.info("Clearing calculator history");
+        calculationHistory.clear();
+        historyListView.setItems(javafx.collections.FXCollections.observableArrayList(calculationHistory));
+        updateStatus("History cleared");
+    }
+
     /**
      * Handle sign change button click
      */
     @FXML
     private void handleSignChange(javafx.event.ActionEvent event) {
         logger.info("Sign change button clicked");
-        
+
         if (!currentInput.equals("0")) {
             if (currentInput.startsWith("-")) {
                 currentInput = currentInput.substring(1);
@@ -205,7 +224,7 @@ public class CalculatorController implements Initializable {
             updateDisplay();
         }
     }
-    
+
     /**
      * Handle mode toggle
      */
@@ -217,7 +236,7 @@ public class CalculatorController implements Initializable {
         updateStatus(advancedMode ? "Advanced Mode Active" : "Basic Mode Active");
         logger.info("Mode changed to: {}", advancedMode ? "Advanced" : "Basic");
     }
-    
+
     /**
      * Convert display operator to gRPC operator
      */
@@ -231,21 +250,21 @@ public class CalculatorController implements Initializable {
             default -> displayOperator;
         };
     }
-    
+
     /**
      * Update display field
      */
     private void updateDisplay() {
         displayField.setText(currentInput);
     }
-    
+
     /**
      * Update status label
      */
     private void updateStatus(String status) {
         statusLabel.setText(status);
     }
-    
+
     /**
      * Format result for display
      */
@@ -256,7 +275,7 @@ public class CalculatorController implements Initializable {
             return String.format("%.10g", result);
         }
     }
-    
+
     /**
      * Show alert dialog
      */
@@ -267,7 +286,7 @@ public class CalculatorController implements Initializable {
         alert.setContentText(message);
         alert.showAndWait();
     }
-    
+
     /**
      * Cleanup resources
      */

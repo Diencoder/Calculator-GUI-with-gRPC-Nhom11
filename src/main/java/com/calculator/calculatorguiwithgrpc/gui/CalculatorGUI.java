@@ -4,6 +4,8 @@ import com.calculator.calculatorguiwithgrpc.client.CalculatorClient;
 import com.calculator.calculatorguiwithgrpc.utils.ValidationUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -29,6 +31,7 @@ public class CalculatorGUI extends Application {
 
     private TextField displayField;
     private Label statusLabel;
+    private ListView<String> historyListView;
     private CalculatorClient calculatorClient;
     private ValidationUtils validationUtils;
 
@@ -37,6 +40,7 @@ public class CalculatorGUI extends Application {
     private double firstOperand = 0;
     private boolean waitingForOperand = false;
     private boolean advancedMode = false;
+    private ObservableList<String> calculationHistory = FXCollections.observableArrayList();
 
     @Override
     public void start(Stage primaryStage) {
@@ -51,7 +55,6 @@ public class CalculatorGUI extends Application {
         }
 
         Scene scene = createCalculatorScene();
-        // 🟢 Load external CSS
         scene.getStylesheets().add(getClass().getResource("/css/calculator.css").toExternalForm());
 
         primaryStage.setTitle("Calculator GUI with gRPC");
@@ -86,6 +89,12 @@ public class CalculatorGUI extends Application {
         displayField.getStyleClass().add("text-field");
         mainLayout.getChildren().add(displayField);
 
+        // History ListView
+        historyListView = new ListView<>(calculationHistory);
+        historyListView.setPrefHeight(150);
+        historyListView.getStyleClass().add("list-view");
+        mainLayout.getChildren().add(historyListView);
+
         // Mode toggle
         ToggleButton modeToggle = new ToggleButton("Basic Mode");
         modeToggle.setOnAction(e -> {
@@ -94,6 +103,15 @@ public class CalculatorGUI extends Application {
             clearAll();
         });
         mainLayout.getChildren().add(modeToggle);
+
+        // Clear History button
+        Button clearHistoryButton = new Button("Clear History");
+        clearHistoryButton.setPrefSize(150, 40);
+        clearHistoryButton.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        clearHistoryButton.getStyleClass().add("button");
+        clearHistoryButton.getStyleClass().add("button-clear"); // Sử dụng style của nút clear
+        clearHistoryButton.setOnAction(e -> clearHistory());
+        mainLayout.getChildren().add(clearHistoryButton);
 
         // Buttons
         GridPane buttonGrid = createButtonGrid();
@@ -105,7 +123,7 @@ public class CalculatorGUI extends Application {
         statusLabel.setTextFill(Color.GRAY);
         mainLayout.getChildren().add(statusLabel);
 
-        return new Scene(mainLayout, 400, 600);
+        return new Scene(mainLayout, 400, 800); // Tăng chiều cao để chứa nút mới
     }
 
     private GridPane createButtonGrid() {
@@ -214,6 +232,7 @@ public class CalculatorGUI extends Application {
                         operator = "";
                         waitingForOperand = true;
                         updateDisplay();
+                        calculationHistory.add(firstOperand + " " + currentOperator + " " + secondOperand + " = " + currentInput);
                         statusLabel.setText("Result ready");
                         statusLabel.setTextFill(Color.GREEN);
                     } else {
@@ -250,6 +269,14 @@ public class CalculatorGUI extends Application {
         updateDisplay();
         statusLabel.setText("Ready");
         statusLabel.setTextFill(Color.GRAY);
+    }
+
+    private void clearHistory() {
+        calculationHistory.clear();
+        historyListView.setItems(calculationHistory); // Cập nhật giao diện
+        statusLabel.setText("History cleared");
+        statusLabel.setTextFill(Color.GRAY);
+        logger.info("Calculator history cleared");
     }
 
     private void updateDisplay() {

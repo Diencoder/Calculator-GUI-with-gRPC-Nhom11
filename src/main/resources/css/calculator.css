@@ -1,35 +1,72 @@
 .root {
-    -fx-background-color: linear-gradient(to bottom, #f7f9fb, #e4e6e9);
+    -fx-background-color: linear-gradient(to bottom right, #eceff1, #b0bec5);
+    -fx-background-radius: 30;
+    -fx-padding: 30;
 }
 
 .text-field {
-    -fx-font-size: 22px;
+    -fx-font-size: 30px;
+    -fx-font-family: "Arial", sans-serif;
     -fx-font-weight: bold;
-    -fx-background-radius: 10;
-    -fx-border-radius: 10;
-    -fx-border-color: #bdbdbd;
+    -fx-background-radius: 18;
+    -fx-border-radius: 18;
+    -fx-border-color: #78909c;
+    -fx-background-color: #ffffff;
+    -fx-padding: 12 18 12 18;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 12, 0.3, 0, 4);
 }
 
 .button {
-    -fx-background-radius: 10;
+    -fx-background-radius: 15;
+    -fx-font-family: "Arial", sans-serif;
     -fx-font-weight: bold;
+    -fx-font-size: 20px;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 5, 0.4, 2, 2);
+}
+
+.button:hover {
+    -fx-opacity: 0.95;
+    -fx-translate-y: -3;
+    -fx-scale-x: 1.1;
+    -fx-scale-y: 1.1;
+    -fx-effect: dropshadow(gaussian, rgba(0,136,255,0.5), 15, 0.4, 0, 5);
 }
 
 .button-number {
-    -fx-background-color: #f5f5f5;
+    -fx-background-color: linear-gradient(to bottom, #ffffff, #cfd8dc);
+    -fx-text-fill: #37474f;
+    -fx-border-color: #eceff1;
+    -fx-border-width: 1;
+    -fx-border-radius: 15;
 }
 
 .button-operator {
-    -fx-background-color: #4CAF50;
+    -fx-background-color: linear-gradient(to bottom, #66bb6a, #43a047);
     -fx-text-fill: white;
 }
 
 .button-clear {
-    -fx-background-color: #f44336;
+    -fx-background-color: linear-gradient(to bottom, #ef5350, #e53935);
     -fx-text-fill: white;
 }
 
 .button-equal {
-    -fx-background-color: #ff6b35;
+    -fx-background-color: linear-gradient(to bottom, #ffca28, #ffb300);
     -fx-text-fill: white;
+}
+
+/* Style cho ListView lịch sử */
+.list-view {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #78909c;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-padding: 5;
+}
+
+.list-cell {
+    -fx-font-size: 14px;
+    -fx-padding: 5;
+    -fx-text-fill: #37474f;
 }
