@@ -7,12 +7,14 @@ import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
+
 /**
  * Implementation of Calculator Service
  * Handles basic calculation operations
  *
  * @author Calculator Team
- * @version 1.1
+ * @version 1.2
  */
 public class CalculatorServiceImpl extends CalculatorServiceGrpc.CalculatorServiceImplBase {
 
@@ -29,13 +31,9 @@ public class CalculatorServiceImpl extends CalculatorServiceGrpc.CalculatorServi
 
         try {
             // Validate input
-            if (!validationUtils.isValidOperator(request.getOperator())) {
-                sendErrorResponse(responseObserver, "Invalid operator: " + request.getOperator(), request.getRequestId());
-                return;
-            }
-
-            if (!validationUtils.isValidNumber(request.getOperand1()) || !validationUtils.isValidNumber(request.getOperand2())) {
-                sendErrorResponse(responseObserver, "Invalid number format", request.getRequestId());
+            Optional<String> validationError = validateRequest(request);
+            if (validationError.isPresent()) {
+                sendErrorResponse(responseObserver, validationError.get(), request.getRequestId());
                 return;
             }
 
@@ -75,11 +73,9 @@ public class CalculatorServiceImpl extends CalculatorServiceGrpc.CalculatorServi
 
                 try {
                     // Validate and calculate
-                    if (!validationUtils.isValidOperator(request.getOperator()) ||
-                            !validationUtils.isValidNumber(request.getOperand1()) ||
-                            !validationUtils.isValidNumber(request.getOperand2())) {
-
-                        sendErrorResponse(responseObserver, "Invalid input", request.getRequestId());
+                    Optional<String> validationError = validateRequest(request);
+                    if (validationError.isPresent()) {
+                        sendErrorResponse(responseObserver, validationError.get(), request.getRequestId());
                         return;
                     }
 
@@ -117,6 +113,7 @@ public class CalculatorServiceImpl extends CalculatorServiceGrpc.CalculatorServi
     public void healthCheck(HealthCheckRequest request, StreamObserver<HealthCheckResponse> responseObserver) {
         logger.info("Health check requested for service: {}", request.getService());
 
+        // You can expand this to check other services/components (like DB or external services)
         HealthCheckResponse response = HealthCheckResponse.newBuilder()
                 .setStatus(HealthCheckResponse.ServingStatus.SERVING)
                 .setMessage("Calculator service is running")
@@ -127,23 +124,43 @@ public class CalculatorServiceImpl extends CalculatorServiceGrpc.CalculatorServi
     }
 
     /**
+     * Validate the request inputs
+     */
+    private Optional<String> validateRequest(CalculationRequest request) {
+        if (!validationUtils.isValidOperator(request.getOperator())) {
+            return Optional.of("Invalid operator: " + request.getOperator());
+        }
+
+        if (!validationUtils.isValidNumber(request.getOperand1()) || !validationUtils.isValidNumber(request.getOperand2())) {
+            return Optional.of("Invalid number format");
+        }
+
+        return Optional.empty();
+    }
+
+    /**
      * Perform the actual calculation
      */
     private double performCalculation(double operand1, double operand2, String operator) {
-        return switch (operator) {
-            case "+" -> operand1 + operand2;
-            case "-" -> operand1 - operand2;
-            case "*" -> operand1 * operand2;
-            case "/" -> {
+        switch (operator) {
+            case "+":
+                return operand1 + operand2;
+            case "-":
+                return operand1 - operand2;
+            case "*":
+                return operand1 * operand2;
+            case "/":
                 if (operand2 == 0) {
                     throw new ArithmeticException("Division by zero");
                 }
-                yield operand1 / operand2;
-            }
-            case "%" -> operand1 % operand2;
-            case "^" -> Math.pow(operand1, operand2);
-            default -> throw new IllegalArgumentException("Unsupported operator: " + operator);
-        };
+                return operand1 / operand2;
+            case "%":
+                return operand1 % operand2;
+            case "^":
+                return Math.pow(operand1, operand2);
+            default:
+                throw new IllegalArgumentException("Unsupported operator: " + operator);
+        }
     }
 
     /**
