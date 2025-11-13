@@ -1,7 +1,6 @@
 package com.calculator.calculatorguiwithgrpc.gui;
 
 import com.calculator.calculatorguiwithgrpc.client.CalculatorClient;
-import com.calculator.calculatorguiwithgrpc.utils.ValidationUtils;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
@@ -12,66 +11,59 @@ import java.net.URL;
 import java.util.ResourceBundle;
 
 /**
- * Controller for Calculator FXML
- * Handles UI events and interactions
+ * Controller cho Calculator FXML
+ * Xử lý các sự kiện và tương tác của giao diện người dùng
  *
- * @author Calculator Team
+ * @author Nhóm Máy tính
  * @version 1.0
  */
 public class CalculatorController implements Initializable {
 
     private static final Logger logger = LoggerFactory.getLogger(CalculatorController.class);
 
-    // FXML injected components
+    // Các thành phần FXML được tiêm vào
     @FXML private TextField displayField;
     @FXML private ToggleButton modeToggle;
     @FXML private Label statusLabel;
-    @FXML private ListView<String> historyListView;
-    @FXML private Button clearHistoryButton; // Thêm nút xóa lịch sử
 
-    // Calculator components
+    // Các thành phần của Máy tính
     private CalculatorClient calculatorClient;
-    private ValidationUtils validationUtils;
 
-    // Calculator state
+    // Trạng thái máy tính
     private String currentInput = "0";
     private String operator = "";
     private double firstOperand = 0;
     private boolean waitingForOperand = false;
     private boolean advancedMode = false;
-    private java.util.List<String> calculationHistory = new java.util.ArrayList<>();
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        logger.info("Initializing Calculator Controller");
+        logger.info("Khởi tạo Controller cho Máy tính");
 
-        // Initialize components
+        // Khởi tạo các thành phần
         calculatorClient = new CalculatorClient();
-        validationUtils = new ValidationUtils();
 
-        // Check server health
+        // Kiểm tra tình trạng của máy chủ
         if (!calculatorClient.isServerHealthy()) {
-            updateStatus("Server Error - Check connection");
-            logger.error("Failed to connect to Calculator Server");
+            updateStatus("Lỗi Máy chủ - Kiểm tra kết nối");
+            logger.error("Không thể kết nối đến Máy chủ Máy tính");
         } else {
-            updateStatus("Ready");
+            updateStatus("Sẵn sàng");
         }
 
-        // Setup display
+        // Thiết lập màn hình hiển thị
         displayField.setText(currentInput);
-        historyListView.setItems(javafx.collections.FXCollections.observableArrayList(calculationHistory));
-        clearHistoryButton.setOnAction(e -> clearHistory()); // Liên kết hành động xóa lịch sử
     }
 
     /**
-     * Handle number button clicks
+     * Xử lý khi người dùng nhấn nút số
      */
     @FXML
     private void handleNumber(javafx.event.ActionEvent event) {
         Button button = (Button) event.getSource();
         String number = button.getText();
 
-        logger.info("Number button clicked: {}", number);
+        logger.info("Nút số đã được nhấn: {}", number);
 
         if (waitingForOperand) {
             currentInput = number;
@@ -84,39 +76,39 @@ public class CalculatorController implements Initializable {
     }
 
     /**
-     * Handle operator button clicks
+     * Xử lý khi người dùng nhấn nút toán tử
      */
     @FXML
     private void handleOperator(javafx.event.ActionEvent event) {
         Button button = (Button) event.getSource();
         String op = button.getText();
 
-        logger.info("Operator button clicked: {}", op);
+        logger.info("Nút toán tử đã được nhấn: {}", op);
 
-        // Convert display operator to gRPC operator
+        // Chuyển đổi toán tử hiển thị thành toán tử gRPC
         String grpcOperator = convertToGrpcOperator(op);
 
         if (!operator.isEmpty() && !waitingForOperand) {
-            handleEquals();
+            handleEquals(); // Tính toán khi có toán tử và không chờ toán hạng
         }
 
         try {
             firstOperand = Double.parseDouble(currentInput);
             operator = grpcOperator;
             waitingForOperand = true;
-            updateStatus("Enter second number");
+            updateStatus("Nhập số thứ hai");
         } catch (NumberFormatException e) {
-            logger.error("Invalid number format", e);
-            updateStatus("Invalid input");
+            logger.error("Định dạng số không hợp lệ", e);
+            updateStatus("Đầu vào không hợp lệ");
         }
     }
 
     /**
-     * Handle decimal button click
+     * Xử lý khi người dùng nhấn nút dấu chấm thập phân
      */
     @FXML
     private void handleDecimal(javafx.event.ActionEvent event) {
-        logger.info("Decimal button clicked");
+        logger.info("Nút dấu chấm thập phân đã được nhấn");
 
         if (waitingForOperand) {
             currentInput = "0.";
@@ -129,15 +121,15 @@ public class CalculatorController implements Initializable {
     }
 
     /**
-     * Handle equals button click
+     * Xử lý khi người dùng nhấn nút "="
      */
     @FXML
     private void handleEquals(javafx.event.ActionEvent event) {
-        handleEquals();
+        handleEquals(); // Gọi phương thức tính toán
     }
 
     /**
-     * Handle equals calculation
+     * Xử lý phép tính khi người dùng nhấn "="
      */
     private void handleEquals() {
         if (operator.isEmpty() || waitingForOperand) {
@@ -147,36 +139,34 @@ public class CalculatorController implements Initializable {
         try {
             double secondOperand = Double.parseDouble(currentInput);
 
-            logger.info("Performing calculation: {} {} {}", firstOperand, operator, secondOperand);
-            updateStatus("Calculating...");
+            logger.info("Thực hiện phép tính: {} {} {}", firstOperand, operator, secondOperand);
+            updateStatus("Đang tính...");
 
-            // Perform calculation using gRPC
-            CalculatorClient.CalculationResult result = calculatorClient.calculate(firstOperand, secondOperand, operator);
+            // Thực hiện phép tính sử dụng gRPC
+            CalculatorClient.CalculationResult result = calculatorClient.performCalculation(firstOperand, secondOperand, operator);
 
             if (result.isSuccess()) {
                 currentInput = formatResult(result.getResult());
                 operator = "";
                 waitingForOperand = true;
                 updateDisplay();
-                calculationHistory.add(firstOperand + " " + operator + " " + secondOperand + " = " + currentInput);
-                historyListView.setItems(javafx.collections.FXCollections.observableArrayList(calculationHistory));
-                updateStatus("Ready");
-                logger.info("Calculation successful: {} {} {} = {}", firstOperand, operator, secondOperand, result.getResult());
+                updateStatus("Sẵn sàng");
+                logger.info("Tính toán thành công: {} {} {} = {}", firstOperand, operator, secondOperand, result.getResult());
             } else {
-                showAlert("Calculation Error", result.getErrorMessage());
-                updateStatus("Error");
-                logger.error("Calculation failed: {}", result.getErrorMessage());
+                showAlert("Lỗi Tính toán", result.getErrorMessage());
+                updateStatus("Lỗi");
+                logger.error("Tính toán thất bại: {}", result.getErrorMessage());
             }
 
         } catch (NumberFormatException e) {
-            showAlert("Input Error", "Invalid number format");
-            updateStatus("Error");
-            logger.error("Invalid number format", e);
+            showAlert("Lỗi Đầu vào", "Định dạng số không hợp lệ");
+            updateStatus("Lỗi");
+            logger.error("Định dạng số không hợp lệ", e);
         }
     }
 
     /**
-     * Handle clear button click
+     * Xử lý khi người dùng nhấn nút C (Clear)
      */
     @FXML
     private void handleClear(javafx.event.ActionEvent event) {
@@ -184,36 +174,24 @@ public class CalculatorController implements Initializable {
     }
 
     /**
-     * Clear all calculator state
+     * Xóa toàn bộ trạng thái của máy tính
      */
     private void clearAll() {
-        logger.info("Clearing calculator");
+        logger.info("Xóa máy tính");
         currentInput = "0";
         operator = "";
         firstOperand = 0;
         waitingForOperand = false;
-        calculationHistory.clear();
-        historyListView.setItems(javafx.collections.FXCollections.observableArrayList(calculationHistory));
         updateDisplay();
-        updateStatus("Ready");
+        updateStatus("Sẵn sàng");
     }
 
     /**
-     * Clear history only
-     */
-    private void clearHistory() {
-        logger.info("Clearing calculator history");
-        calculationHistory.clear();
-        historyListView.setItems(javafx.collections.FXCollections.observableArrayList(calculationHistory));
-        updateStatus("History cleared");
-    }
-
-    /**
-     * Handle sign change button click
+     * Xử lý khi người dùng nhấn nút thay đổi dấu
      */
     @FXML
     private void handleSignChange(javafx.event.ActionEvent event) {
-        logger.info("Sign change button clicked");
+        logger.info("Nút thay đổi dấu đã được nhấn");
 
         if (!currentInput.equals("0")) {
             if (currentInput.startsWith("-")) {
@@ -226,19 +204,19 @@ public class CalculatorController implements Initializable {
     }
 
     /**
-     * Handle mode toggle
+     * Xử lý khi người dùng thay đổi chế độ
      */
     @FXML
     private void handleModeToggle(javafx.event.ActionEvent event) {
         advancedMode = modeToggle.isSelected();
-        modeToggle.setText(advancedMode ? "Advanced Mode" : "Basic Mode");
+        modeToggle.setText(advancedMode ? "Chế độ Nâng cao" : "Chế độ Cơ bản");
         clearAll();
-        updateStatus(advancedMode ? "Advanced Mode Active" : "Basic Mode Active");
-        logger.info("Mode changed to: {}", advancedMode ? "Advanced" : "Basic");
+        updateStatus(advancedMode ? "Chế độ Nâng cao đã kích hoạt" : "Chế độ Cơ bản đang hoạt động");
+        logger.info("Chế độ đã thay đổi: {}", advancedMode ? "Nâng cao" : "Cơ bản");
     }
 
     /**
-     * Convert display operator to gRPC operator
+     * Chuyển đổi toán tử hiển thị thành toán tử gRPC
      */
     private String convertToGrpcOperator(String displayOperator) {
         return switch (displayOperator) {
@@ -252,21 +230,21 @@ public class CalculatorController implements Initializable {
     }
 
     /**
-     * Update display field
+     * Cập nhật màn hình hiển thị
      */
     private void updateDisplay() {
         displayField.setText(currentInput);
     }
 
     /**
-     * Update status label
+     * Cập nhật trạng thái của máy tính
      */
     private void updateStatus(String status) {
         statusLabel.setText(status);
     }
 
     /**
-     * Format result for display
+     * Định dạng kết quả cho hiển thị
      */
     private String formatResult(double result) {
         if (result == (long) result) {
@@ -277,7 +255,7 @@ public class CalculatorController implements Initializable {
     }
 
     /**
-     * Show alert dialog
+     * Hiển thị hộp thoại cảnh báo
      */
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -288,7 +266,7 @@ public class CalculatorController implements Initializable {
     }
 
     /**
-     * Cleanup resources
+     * Dọn dẹp tài nguyên
      */
     public void cleanup() {
         if (calculatorClient != null) {

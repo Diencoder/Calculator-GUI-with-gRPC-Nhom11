@@ -4,8 +4,6 @@ import com.calculator.calculatorguiwithgrpc.client.CalculatorClient;
 import com.calculator.calculatorguiwithgrpc.utils.ValidationUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -21,324 +19,267 @@ import org.slf4j.LoggerFactory;
 /**
  * Calculator GUI Application using JavaFX
  * Provides a graphical interface for the Calculator gRPC service
- *
- * @author Calculator
- * @version 2.0
+ * 
+ * @author Calculator Team
+ * @version 1.0
  */
 public class CalculatorGUI extends Application {
-
+    
     private static final Logger logger = LoggerFactory.getLogger(CalculatorGUI.class);
-
-    private TextField displayField; // Màn hình hiển thị chính
-    private Label expressionLabel; // Hiển thị biểu thức (ví dụ: "8 × 9 =")
-    private Label statusLabel;
-    private ListView<String> historyListView;
+    
+    // UI Components
+    private TextField displayField;
     private CalculatorClient calculatorClient;
     private ValidationUtils validationUtils;
-
-    private String currentInput = "0";
+    
+    // Calculator state
+    private String currentInput = "";
     private String operator = "";
-    private String expression = ""; // Biểu thức hiện tại
     private double firstOperand = 0;
     private boolean waitingForOperand = false;
     private boolean advancedMode = false;
-    private ObservableList<String> calculationHistory = FXCollections.observableArrayList();
-
+    
     @Override
     public void start(Stage primaryStage) {
         logger.info("Starting Calculator GUI Application");
-
+        
+        // Initialize components
         calculatorClient = new CalculatorClient();
         validationUtils = new ValidationUtils();
-
+        
+        // Check server health
         if (!calculatorClient.isServerHealthy()) {
-            showError("Lỗi kết nối Server", "Không thể kết nối đến Calculator Server. Vui lòng đảm bảo server đang chạy.");
+            showAlert("Server Error", "Cannot connect to Calculator Server. Please ensure the server is running.");
             logger.error("Failed to connect to Calculator Server");
         }
-
+        
+        // Create UI
         Scene scene = createCalculatorScene();
-        scene.getStylesheets().add(getClass().getResource("/css/calculator.css").toExternalForm());
-
+        
+        // Setup stage
         primaryStage.setTitle("Calculator GUI with gRPC");
         primaryStage.setScene(scene);
         primaryStage.setResizable(false);
         primaryStage.setOnCloseRequest(e -> {
-            if (calculatorClient != null) calculatorClient.shutdown();
+            logger.info("Closing Calculator GUI Application");
+            if (calculatorClient != null) {
+                calculatorClient.shutdown();
+            }
             Platform.exit();
         });
-
+        
         primaryStage.show();
-        logger.info("Calculator GUI started successfully");
+        logger.info("Calculator GUI Application started successfully");
     }
-
+    
+    /**
+     * Create the main calculator scene
+     */
     private Scene createCalculatorScene() {
-        // Layout chính: BorderPane để có display ở trên, bàn phím ở giữa, lịch sử bên phải
-        BorderPane mainLayout = new BorderPane();
-        mainLayout.setPadding(new Insets(15));
-        mainLayout.getStyleClass().add("root");
-
-        // === PHẦN BÊN TRÁI: Display và Bàn phím ===
-        VBox leftPanel = new VBox(10);
-        leftPanel.setPadding(new Insets(10));
-
+        VBox mainLayout = new VBox(10);
+        mainLayout.setPadding(new Insets(20));
+        mainLayout.setAlignment(Pos.CENTER);
+        mainLayout.setStyle("-fx-background-color: #f0f0f0;");
+        
         // Title
-        Label titleLabel = new Label("Máy tính với gRPC");
-        titleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+        Label titleLabel = new Label("Calculator GUI with gRPC");
+        titleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 24));
         titleLabel.setTextFill(Color.DARKBLUE);
-        leftPanel.getChildren().add(titleLabel);
-
-        // Display Section - Giống máy tính Microsoft
-        VBox displaySection = new VBox(5);
-        displaySection.setStyle("-fx-background-color: #1e1e1e; -fx-background-radius: 5; -fx-padding: 15;");
+        mainLayout.getChildren().add(titleLabel);
         
-        // Expression label (hiển thị biểu thức như "8 × 9 =")
-        expressionLabel = new Label("");
-        expressionLabel.setFont(Font.font("Arial", 16));
-        expressionLabel.setTextFill(Color.GRAY);
-        expressionLabel.setAlignment(Pos.CENTER_RIGHT);
-        expressionLabel.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(expressionLabel, Priority.ALWAYS);
-        
-        // Display field - Màn hình hiển thị chính
+        // Display field
         displayField = new TextField("0");
         displayField.setEditable(false);
+        displayField.setFont(Font.font("Arial", FontWeight.BOLD, 20));
         displayField.setAlignment(Pos.CENTER_RIGHT);
-        displayField.setPrefHeight(80);
-        displayField.setFont(Font.font("Arial", FontWeight.BOLD, 36));
-        displayField.setStyle("-fx-background-color: #1e1e1e; -fx-text-fill: white; -fx-border-width: 0;");
-        displayField.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(displayField, Priority.ALWAYS);
+        displayField.setPrefHeight(60);
+        displayField.setStyle("-fx-background-color: white; -fx-border-color: #ccc; -fx-border-width: 2;");
+        mainLayout.getChildren().add(displayField);
         
-        displaySection.getChildren().addAll(expressionLabel, displayField);
-        leftPanel.getChildren().add(displaySection);
-
-        // Bàn phím số và phép toán
-        GridPane calculatorPad = createCalculatorPad();
-        leftPanel.getChildren().add(calculatorPad);
-
+        // Mode toggle
+        ToggleButton modeToggle = new ToggleButton("Basic Mode");
+        modeToggle.setSelected(false);
+        modeToggle.setOnAction(e -> {
+            advancedMode = modeToggle.isSelected();
+            modeToggle.setText(advancedMode ? "Advanced Mode" : "Basic Mode");
+            clearAll();
+        });
+        mainLayout.getChildren().add(modeToggle);
+        
+        // Button grid
+        GridPane buttonGrid = createButtonGrid();
+        mainLayout.getChildren().add(buttonGrid);
+        
         // Status label
-        statusLabel = new Label("Sẵn sàng");
-        statusLabel.setFont(Font.font("Arial", 11));
+        Label statusLabel = new Label("Ready");
+        statusLabel.setFont(Font.font("Arial", 12));
         statusLabel.setTextFill(Color.GRAY);
-        leftPanel.getChildren().add(statusLabel);
-
-        // === PHẦN BÊN PHẢI: Lịch sử ===
-        VBox rightPanel = new VBox(10);
-        rightPanel.setPrefWidth(250);
-        rightPanel.setPadding(new Insets(10));
+        mainLayout.getChildren().add(statusLabel);
         
-        Label historyLabel = new Label("Lịch sử");
-        historyLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
-        historyLabel.setTextFill(Color.DARKSLATEGRAY);
-        
-        historyListView = new ListView<>(calculationHistory);
-        historyListView.setPrefHeight(600);
-        historyListView.getStyleClass().add("list-view");
-        historyListView.setStyle("-fx-font-size: 14px;");
-        
-        Button clearHistoryButton = new Button("Xóa lịch sử");
-        clearHistoryButton.setPrefWidth(Double.MAX_VALUE);
-        clearHistoryButton.setPrefHeight(35);
-        clearHistoryButton.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-        clearHistoryButton.getStyleClass().add("button");
-        clearHistoryButton.getStyleClass().add("button-clear");
-        clearHistoryButton.setOnAction(e -> clearHistory());
-        
-        rightPanel.getChildren().addAll(historyLabel, historyListView, clearHistoryButton);
-
-        // Gắn các panel vào BorderPane
-        mainLayout.setLeft(leftPanel);
-        mainLayout.setRight(rightPanel);
-        BorderPane.setMargin(rightPanel, new Insets(0, 0, 0, 15));
-
-        return new Scene(mainLayout, 800, 700);
+        return new Scene(mainLayout, 400, 600);
     }
-
+    
     /**
-     * Tạo bàn phím máy tính đầy đủ (giống Microsoft Calculator)
+     * Create the button grid
      */
-    private GridPane createCalculatorPad() {
+    private GridPane createButtonGrid() {
         GridPane grid = new GridPane();
-        grid.setHgap(8);
-        grid.setVgap(8);
+        grid.setHgap(10);
+        grid.setVgap(10);
         grid.setAlignment(Pos.CENTER);
-
-        // Hàng 1: %, CE, C, ⌫
-        grid.add(createFunctionButton("%"), 0, 0);
-        grid.add(createFunctionButton("CE"), 1, 0);
-        grid.add(createFunctionButton("C"), 2, 0);
-        grid.add(createFunctionButton("⌫"), 3, 0);
-
-        // Hàng 2: 1/x, x², √x, ÷
-        grid.add(createFunctionButton("1/x"), 0, 1);
-        grid.add(createFunctionButton("x²"), 1, 1);
-        grid.add(createFunctionButton("√x"), 2, 1);
-        grid.add(createOperatorButton("÷"), 3, 1);
-
-        // Hàng 3: 7, 8, 9, ×
-        grid.add(createNumberButton("7"), 0, 2);
-        grid.add(createNumberButton("8"), 1, 2);
-        grid.add(createNumberButton("9"), 2, 2);
-        grid.add(createOperatorButton("×"), 3, 2);
-
-        // Hàng 4: 4, 5, 6, -
-        grid.add(createNumberButton("4"), 0, 3);
-        grid.add(createNumberButton("5"), 1, 3);
-        grid.add(createNumberButton("6"), 2, 3);
-        grid.add(createOperatorButton("-"), 3, 3);
-
-        // Hàng 5: 1, 2, 3, +
-        grid.add(createNumberButton("1"), 0, 4);
-        grid.add(createNumberButton("2"), 1, 4);
-        grid.add(createNumberButton("3"), 2, 4);
-        grid.add(createOperatorButton("+"), 3, 4);
-
-        // Hàng 6: ±, 0, ., =
-        grid.add(createFunctionButton("±"), 0, 5);
-        grid.add(createNumberButton("0"), 1, 5);
-        grid.add(createNumberButton("."), 2, 5);
-        Button btnEquals = createOperatorButton("=");
-        btnEquals.getStyleClass().add("button-equal");
-        btnEquals.setOnAction(e -> handleEquals());
-        grid.add(btnEquals, 3, 5);
-
+        
+        // Button definitions
+        String[][] buttonTexts = {
+            {"C", "±", "%", "÷"},
+            {"7", "8", "9", "×"},
+            {"4", "5", "6", "-"},
+            {"1", "2", "3", "+"},
+            {"0", ".", "="}
+        };
+        
+        // Create buttons
+        for (int row = 0; row < buttonTexts.length; row++) {
+            for (int col = 0; col < buttonTexts[row].length; col++) {
+                String text = buttonTexts[row][col];
+                Button button = createButton(text);
+                
+                // Special handling for "=" button
+                if ("=".equals(text)) {
+                    GridPane.setColumnSpan(button, 2);
+                    button.setStyle("-fx-background-color: #ff6b35; -fx-text-fill: white; -fx-font-weight: bold;");
+                }
+                
+                grid.add(button, col, row);
+            }
+        }
+        
         return grid;
     }
-
+    
     /**
-     * Tạo nút số
+     * Create a calculator button
      */
-    private Button createNumberButton(String text) {
+    private Button createButton(String text) {
         Button button = new Button(text);
-        button.setPrefSize(70, 55);
-        button.setFont(Font.font("Arial", FontWeight.BOLD, 20));
-        button.getStyleClass().add("button");
-        button.getStyleClass().add("button-number");
-        
-        button.setOnAction(e -> handleNumberInput(text));
-        return button;
-    }
-
-    /**
-     * Tạo nút phép toán
-     */
-    private Button createOperatorButton(String text) {
-        Button button = new Button(text);
-        button.setPrefSize(70, 55);
-        button.setFont(Font.font("Arial", FontWeight.BOLD, 20));
-        button.getStyleClass().add("button");
-        button.getStyleClass().add("button-operator");
-        
-        button.setOnAction(e -> handleOperatorInput(text));
-        return button;
-    }
-
-    /**
-     * Tạo nút chức năng
-     */
-    private Button createFunctionButton(String text) {
-        Button button = new Button(text);
-        button.setPrefSize(70, 55);
+        button.setPrefSize(70, 50);
         button.setFont(Font.font("Arial", FontWeight.BOLD, 16));
-        button.getStyleClass().add("button");
-        button.getStyleClass().add("button-clear");
         
-        switch (text) {
-            case "C":
-                button.setOnAction(e -> handleClearAll());
-                break;
-            case "CE":
-                button.setOnAction(e -> handleClearEntry());
-                break;
-            case "±":
-                button.setOnAction(e -> handleSignChange());
-                break;
-            case "⌫":
-                button.setOnAction(e -> handleBackspace());
-                break;
-            case "%":
-                button.setOnAction(e -> handleOperatorInput("%"));
-                break;
-            case "1/x":
-                button.setOnAction(e -> handleReciprocal());
-                break;
-            case "x²":
-                button.setOnAction(e -> handleSquare());
-                break;
-            case "√x":
-                button.setOnAction(e -> handleSquareRoot());
-                break;
+        // Set button styles
+        if (isNumber(text) || ".".equals(text)) {
+            button.setStyle("-fx-background-color: #e0e0e0; -fx-border-color: #ccc;");
+        } else if (isOperator(text)) {
+            button.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold;");
+        } else if ("C".equals(text) || "±".equals(text)) {
+            button.setStyle("-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-weight: bold;");
         }
+        
+        // Set button action
+        button.setOnAction(e -> handleButtonClick(text));
+        
         return button;
     }
-
+    
     /**
-     * Xử lý nhập số
+     * Handle button click events
      */
-    private void handleNumberInput(String input) {
-        if (".".equals(input)) {
-            // Xử lý dấu chấm
-            if (waitingForOperand) {
-                currentInput = "0.";
-                waitingForOperand = false;
-            } else if (!currentInput.contains(".")) {
-                currentInput += ".";
-            }
+    private void handleButtonClick(String text) {
+        logger.info("Button clicked: {}", text);
+        
+        if (isNumber(text)) {
+            handleNumberInput(text);
+        } else if (isOperator(text)) {
+            handleOperatorInput(text);
+        } else if (".".equals(text)) {
+            handleDecimalInput();
+        } else if ("C".equals(text)) {
+            clearAll();
+        } else if ("±".equals(text)) {
+            handleSignChange();
+        } else if ("=".equals(text)) {
+            handleEquals();
+        }
+    }
+    
+    /**
+     * Handle number input
+     */
+    private void handleNumberInput(String number) {
+        if (waitingForOperand) {
+            currentInput = number;
+            waitingForOperand = false;
         } else {
-            // Xử lý số
-            if (waitingForOperand) {
-                currentInput = input;
-                waitingForOperand = false;
-            } else {
-                if (currentInput.equals("0")) {
-                    currentInput = input;
-                } else {
-                    currentInput += input;
-                }
-            }
+            currentInput = currentInput.equals("0") ? number : currentInput + number;
         }
         updateDisplay();
     }
-
+    
     /**
-     * Xử lý nhập phép toán
+     * Handle operator input
      */
     private void handleOperatorInput(String op) {
         if (!operator.isEmpty() && !waitingForOperand) {
-            // Nếu đã có phép toán, tính kết quả trước
             handleEquals();
         }
         
-        if (!waitingForOperand) {
-            try {
-                firstOperand = Double.parseDouble(currentInput);
-                operator = convertOperatorSymbol(op);
-                waitingForOperand = true;
-                expression = formatNumber(firstOperand) + " " + op;
-                expressionLabel.setText(expression);
-            } catch (NumberFormatException e) {
-                showError("Lỗi", "Số không hợp lệ");
-            }
-        }
-    }
-
-    /**
-     * Xóa tất cả (C)
-     */
-    private void handleClearAll() {
-        clearAll();
-    }
-
-    /**
-     * Xóa entry hiện tại (CE)
-     */
-    private void handleClearEntry() {
-        currentInput = "0";
+        firstOperand = Double.parseDouble(currentInput);
+        operator = convertOperatorSymbol(op);
+        waitingForOperand = true;
+        
+        // Display the operator on screen
+        currentInput = op;
         updateDisplay();
     }
-
+    
     /**
-     * Đổi dấu
+     * Handle decimal input
+     */
+    private void handleDecimalInput() {
+        if (waitingForOperand) {
+            currentInput = "0.";
+            waitingForOperand = false;
+        } else if (!currentInput.contains(".")) {
+            currentInput += ".";
+        }
+        updateDisplay();
+    }
+    
+    /**
+     * Handle equals button
+     */
+    private void handleEquals() {
+        if (operator.isEmpty() || waitingForOperand) {
+            return;
+        }
+        
+        try {
+            double secondOperand = Double.parseDouble(currentInput);
+            String currentOperator = operator; // Store operator before reset
+            
+
+            // Thực hiện phép tính sử dụng gRPC
+            CalculatorClient.CalculationResult result = calculatorClient.performCalculation(firstOperand, secondOperand, operator);
+
+
+            if (result.isSuccess()) {
+                currentInput = formatResult(result.getResult());
+                logger.info("Formatted result: {}", currentInput);
+                operator = "";
+                waitingForOperand = true;
+                updateDisplay();
+                logger.info("Calculation successful: {} {} {} = {}", firstOperand, currentOperator, secondOperand, result.getResult());
+            } else {
+                showAlert("Calculation Error", result.getErrorMessage());
+                logger.error("Calculation failed: {}", result.getErrorMessage());
+            }
+            
+        } catch (NumberFormatException e) {
+            showAlert("Input Error", "Invalid number format");
+            logger.error("Invalid number format", e);
+        }
+    }
+    
+    /**
+     * Handle sign change
      */
     private void handleSignChange() {
         if (!currentInput.equals("0")) {
@@ -350,202 +291,30 @@ public class CalculatorGUI extends Application {
             updateDisplay();
         }
     }
-
+    
     /**
-     * Xóa ký tự cuối cùng
+     * Clear all
      */
-    private void handleBackspace() {
-        if (!currentInput.equals("0") && currentInput.length() > 1) {
-            currentInput = currentInput.substring(0, currentInput.length() - 1);
-        } else {
-            currentInput = "0";
-        }
-        updateDisplay();
-    }
-
-    /**
-     * Nghịch đảo (1/x)
-     */
-    private void handleReciprocal() {
-        try {
-            double value = Double.parseDouble(currentInput);
-            if (value == 0) {
-                showError("Lỗi", "Không thể chia cho 0");
-                return;
-            }
-            performCalculation(value, 1.0, "/");
-        } catch (NumberFormatException e) {
-            showError("Lỗi", "Số không hợp lệ");
-        }
-    }
-
-    /**
-     * Bình phương (x²)
-     */
-    private void handleSquare() {
-        try {
-            double value = Double.parseDouble(currentInput);
-            performCalculation(value, value, "*");
-        } catch (NumberFormatException e) {
-            showError("Lỗi", "Số không hợp lệ");
-        }
-    }
-
-    /**
-     * Căn bậc hai (√x)
-     */
-    private void handleSquareRoot() {
-        try {
-            double value = Double.parseDouble(currentInput);
-            if (value < 0) {
-                showError("Lỗi", "Không thể tính căn số âm");
-                return;
-            }
-            double result = Math.sqrt(value);
-            currentInput = formatResult(result);
-            expression = "√(" + formatNumber(value) + ") =";
-            expressionLabel.setText(expression);
-            updateDisplay();
-            addToHistory(expression + " " + currentInput);
-        } catch (NumberFormatException e) {
-            showError("Lỗi", "Số không hợp lệ");
-        }
-    }
-
-    /**
-     * Thực hiện tính toán
-     */
-    private void performCalculation(double op1, double op2, String op) {
-        updateStatus("Đang tính toán...", Color.BLUE);
-        
-        new Thread(() -> {
-            try {
-                CalculatorClient.CalculationResult result = calculatorClient.calculate(op1, op2, op);
-                
-                Platform.runLater(() -> {
-                    if (result.isSuccess()) {
-                        currentInput = formatResult(result.getResult());
-                        expression = formatNumber(op1) + " " + getOperatorSymbol(op) + " " + formatNumber(op2) + " =";
-                        expressionLabel.setText(expression);
-                        updateDisplay();
-                        addToHistory(expression + " " + currentInput);
-                        updateStatus("Tính toán thành công!", Color.GREEN);
-                    } else {
-                        showError("Lỗi tính toán", result.getErrorMessage());
-                        updateStatus("Lỗi: " + result.getErrorMessage(), Color.RED);
-                    }
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    showError("Lỗi kết nối", "Không thể kết nối đến server");
-                    updateStatus("Lỗi kết nối", Color.RED);
-                });
-            }
-        }).start();
-    }
-
-    /**
-     * Thêm vào lịch sử
-     */
-    private void addToHistory(String entry) {
-        calculationHistory.add(0, entry);
-        if (calculationHistory.size() > 100) {
-            calculationHistory.remove(calculationHistory.size() - 1);
-        }
-    }
-
-
-
-    /**
-     * Xử lý nút bằng (=)
-     */
-    private void handleEquals() {
-        if (operator.isEmpty() || waitingForOperand) return;
-
-        try {
-            double secondOperand = Double.parseDouble(currentInput);
-            
-            performCalculation(firstOperand, secondOperand, operator);
-            
-            operator = "";
-            waitingForOperand = true;
-        } catch (NumberFormatException e) {
-            showError("Lỗi", "Số không hợp lệ");
-        }
-    }
-
-
     private void clearAll() {
         currentInput = "0";
         operator = "";
-        expression = "";
         firstOperand = 0;
         waitingForOperand = false;
-        
         updateDisplay();
-        if (expressionLabel != null) {
-            expressionLabel.setText("");
-        }
-        
-        updateStatus("Sẵn sàng", Color.GRAY);
     }
-
-    private void clearHistory() {
-        calculationHistory.clear();
-        historyListView.setItems(calculationHistory);
-        updateStatus("Đã xóa lịch sử", Color.GRAY);
-        logger.info("Calculator history cleared");
-    }
-
+    
+    /**
+     * Update display
+     */
     private void updateDisplay() {
-        if (displayField != null) {
-            displayField.setText(currentInput);
-        }
+        logger.info("Updating display with: {}", currentInput);
+        displayField.setText(currentInput);
+        logger.info("Display field text after update: {}", displayField.getText());
     }
-
+    
     /**
-     * Cập nhật trạng thái với màu sắc
+     * Format result for display
      */
-    private void updateStatus(String message, Color color) {
-        statusLabel.setText(message);
-        statusLabel.setTextFill(color);
-    }
-
-    /**
-     * Hiển thị lỗi với alert dialog
-     */
-    private void showError(String title, String message) {
-        Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle(title);
-            alert.setHeaderText(null);
-            alert.setContentText(message);
-            alert.showAndWait();
-        });
-    }
-
-    /**
-     * Lấy ký hiệu phép toán để hiển thị
-     */
-    private String getOperatorSymbol(String operator) {
-        return switch (operator) {
-            case "*" -> "×";
-            case "/" -> "÷";
-            default -> operator;
-        };
-    }
-
-    /**
-     * Định dạng số để hiển thị
-     */
-    private String formatNumber(double number) {
-        if (number == (long) number) {
-            return String.valueOf((long) number);
-        } else {
-            return String.format("%.10g", number);
-        }
-    }
-
     private String formatResult(double result) {
         if (result == (long) result) {
             return String.valueOf((long) result);
@@ -553,16 +322,27 @@ public class CalculatorGUI extends Application {
             return String.format("%.10g", result);
         }
     }
-
+    
+    /**
+     * Check if text is a number
+     */
     private boolean isNumber(String text) {
         return text.matches("[0-9]");
     }
-
+    
+    /**
+     * Check if text is an operator
+     */
     private boolean isOperator(String text) {
         String convertedSymbol = convertOperatorSymbol(text);
-        return validationUtils.isValidOperator(convertedSymbol);
+        boolean isValid = validationUtils.isValidOperator(convertedSymbol);
+        logger.info("Checking operator: '{}' -> '{}' -> {}", text, convertedSymbol, isValid);
+        return isValid;
     }
-
+    
+    /**
+     * Convert GUI operator symbols to gRPC service symbols
+     */
     private String convertOperatorSymbol(String guiSymbol) {
         switch (guiSymbol) {
             case "×":
@@ -578,28 +358,25 @@ public class CalculatorGUI extends Application {
                 return guiSymbol;
         }
     }
-
+    
     /**
-     * Hiển thị thông báo thành công
+     * Show alert dialog
      */
-    private void showSuccess(String title, String message) {
+    private void showAlert(String title, String message) {
         Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(message);
             alert.showAndWait();
         });
     }
-
+    
     /**
-     * Giữ lại phương thức cũ để tương thích
+     * Main method
      */
-    private void showAlert(String title, String message) {
-        showError(title, message);
-    }
-
     public static void main(String[] args) {
+        logger.info("Launching Calculator GUI Application");
         launch(args);
     }
 }
