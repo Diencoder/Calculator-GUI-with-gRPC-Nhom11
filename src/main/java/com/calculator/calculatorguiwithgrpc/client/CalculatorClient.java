@@ -28,15 +28,18 @@ public class CalculatorClient {
     private static final long REQUEST_TIMEOUT_SECONDS = 10;
     private static final long CONNECTION_TIMEOUT_SECONDS = 5;
 
-    // Giới hạn cho validation
+    // Giới hạn cho validation (có thể được config từ bên ngoài)
     private static final double MAX_SAFE_VALUE = 1e15;  // Giá trị tối đa an toàn
     private static final double MIN_SAFE_VALUE = -1e15; // Giá trị tối thiểu an toàn
     private static final double MAX_EXPONENT = 1000;    // Số mũ tối đa cho phép
+    private static final int MAX_RETRY_ATTEMPTS = 3;    // Số lần retry tối đa
+    private static final long RETRY_DELAY_MS = 500;     // Delay giữa các lần retry (ms)
 
     private final ManagedChannel channel;
     private final CalculatorServiceGrpc.CalculatorServiceBlockingStub blockingStub;
     private final String clientId;
     private final ValidationUtils validationUtils;
+    private volatile boolean isShutdown = false;
 
     /**
      * Constructor với host và port mặc định
@@ -76,6 +79,18 @@ public class CalculatorClient {
      * Gửi CalculationRequest (OperationRequest) và nhận CalculationResponse (OperationResult)
      */
     public CalculationResult performCalculation(double operand1, double operand2, String operator) {
+        // Kiểm tra client đã shutdown chưa
+        if (isShutdown) {
+            logger.warn("[Client-{}] Client đã bị shutdown, không thể thực hiện tính toán", clientId);
+            return new CalculationResult(false, 0.0, "Client đã bị shutdown.");
+        }
+
+        // Kiểm tra channel state
+        if (channel == null || channel.isShutdown() || channel.isTerminated()) {
+            logger.error("[Client-{}] Channel không khả dụng", clientId);
+            return new CalculationResult(false, 0.0, "Kết nối đến server không khả dụng.");
+        }
+
         logger.info("[Client-{}] Gửi yêu cầu tính toán: {} {} {}", clientId, operand1, operator, operand2);
 
         // Validation chi tiết với thông báo lỗi cụ thể
@@ -94,8 +109,8 @@ public class CalculatorClient {
         logger.debug("[Client-{}] Request ID: {}, Request: operand1={}, operand2={}, operator={}",
                 clientId, requestId, operand1, operand2, operator);
 
-        // Gửi request và nhận response (OperationResult)
-        return sendCalculationRequest(request);
+        // Gửi request với retry mechanism
+        return sendCalculationRequestWithRetry(request);
     }
 
     /**
@@ -248,7 +263,8 @@ public class CalculatorClient {
     }
 
     /**
-     * Lớp kết quả validation (tương tự ValidationUtils.ValidationResult)
+     * Lớp kết quả validation (sử dụng ValidationUtils.ValidationResult thay vì duplicate)
+     * Giữ lại class này để tương thích với code hiện tại, nhưng có thể refactor sau
      */
     private static class ValidationResult {
         private final boolean isValid;
@@ -278,6 +294,64 @@ public class CalculatorClient {
                 .setOperator(operator)
                 .setRequestId(requestId)
                 .build();
+    }
+
+    /**
+     * Gửi yêu cầu tính toán với retry mechanism
+     * Xử lý các lỗi tạm thời bằng cách retry
+     */
+    private CalculationResult sendCalculationRequestWithRetry(CalculationRequest request) {
+        String requestId = request.getRequestId();
+        int attempt = 0;
+
+        while (attempt < MAX_RETRY_ATTEMPTS) {
+            attempt++;
+            logger.debug("[Client-{}] Gửi request ID: {} (Lần thử: {}/{})", 
+                    clientId, requestId, attempt, MAX_RETRY_ATTEMPTS);
+
+            CalculationResult result = sendCalculationRequest(request);
+            
+            // Nếu thành công hoặc lỗi không thể retry, trả về ngay
+            if (result.isSuccess() || !shouldRetry(result.getErrorMessage())) {
+                if (attempt > 1) {
+                    logger.info("[Client-{}] Request ID: {} thành công sau {} lần thử", 
+                            clientId, requestId, attempt);
+                }
+                return result;
+            }
+
+            // Nếu cần retry và chưa đạt max attempts
+            if (attempt < MAX_RETRY_ATTEMPTS) {
+                logger.warn("[Client-{}] Request ID: {} thất bại, đang retry sau {}ms...", 
+                        clientId, requestId, RETRY_DELAY_MS);
+                try {
+                    Thread.sleep(RETRY_DELAY_MS * attempt); // Exponential backoff
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.error("[Client-{}] Retry bị gián đoạn", clientId);
+                    return new CalculationResult(false, 0.0, "Request bị gián đoạn.");
+                }
+            }
+        }
+
+        logger.error("[Client-{}] Request ID: {} thất bại sau {} lần thử", 
+                clientId, requestId, MAX_RETRY_ATTEMPTS);
+        return new CalculationResult(false, 0.0, 
+                "Không thể kết nối đến server sau " + MAX_RETRY_ATTEMPTS + " lần thử.");
+    }
+
+    /**
+     * Kiểm tra xem có nên retry request không dựa trên error message
+     */
+    private boolean shouldRetry(String errorMessage) {
+        if (errorMessage == null) {
+            return false;
+        }
+        // Retry cho các lỗi tạm thời
+        return errorMessage.contains("không thể kết nối") ||
+               errorMessage.contains("timeout") ||
+               errorMessage.contains("không phản hồi") ||
+               errorMessage.contains("UNAVAILABLE");
     }
 
     /**
@@ -390,6 +464,11 @@ public class CalculatorClient {
      * Kiểm tra tình trạng của máy chủ
      */
     public boolean isServerHealthy() {
+        if (isShutdown || channel == null || channel.isShutdown() || channel.isTerminated()) {
+            logger.warn("[Client-{}] Client hoặc channel không khả dụng để kiểm tra health", clientId);
+            return false;
+        }
+
         logger.info("[Client-{}] Đang kiểm tra tình trạng máy chủ...", clientId);
 
         try {
@@ -429,6 +508,12 @@ public class CalculatorClient {
      * Tắt máy khách và đóng kết nối
      */
     public void shutdown() {
+        if (isShutdown) {
+            logger.warn("[Client-{}] Client đã được shutdown trước đó", clientId);
+            return;
+        }
+
+        isShutdown = true;
         logger.info("[Client-{}] Đang tắt Calculator Client...", clientId);
 
         try {
@@ -453,6 +538,20 @@ public class CalculatorClient {
         } catch (Exception e) {
             logger.error("[Client-{}] Lỗi không mong đợi khi tắt client", clientId, e);
         }
+    }
+
+    /**
+     * Kiểm tra xem client đã bị shutdown chưa
+     */
+    public boolean isShutdown() {
+        return isShutdown;
+    }
+
+    /**
+     * Kiểm tra xem channel có đang kết nối không
+     */
+    public boolean isConnected() {
+        return channel != null && !channel.isShutdown() && !channel.isTerminated() && !isShutdown;
     }
 
     /**
