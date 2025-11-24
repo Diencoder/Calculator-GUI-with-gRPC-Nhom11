@@ -22,17 +22,10 @@ import java.util.concurrent.TimeUnit;
 public class CalculatorClient {
 
     private static final Logger logger = LoggerFactory.getLogger(CalculatorClient.class);
-    private static final String DEFAULT_HOST = "localhost";
-    private static final int DEFAULT_PORT = 9090;
-    private static final long REQUEST_TIMEOUT_SECONDS = 10;
-    private static final long CONNECTION_TIMEOUT_SECONDS = 5;
-
-    private static final int MAX_RETRY_ATTEMPTS = 3;    // Số lần retry tối đa
-    private static final long RETRY_DELAY_MS = 500;     // Delay giữa các lần retry (ms)
-
     private final ManagedChannel channel;
     private final CalculatorServiceGrpc.CalculatorServiceBlockingStub blockingStub;
     private final String clientId;
+    private final CalculatorClientConfig config;
     private final CalculatorInputValidator inputValidator;
     private volatile boolean isShutdown = false;
 
@@ -40,19 +33,28 @@ public class CalculatorClient {
      * Constructor với host và port mặc định
      */
     public CalculatorClient() {
-        this(DEFAULT_HOST, DEFAULT_PORT);
+        this(CalculatorClientConfig.builder().build());
     }
 
     /**
      * Constructor với host và port tùy chỉnh
      */
     public CalculatorClient(String host, int port) {
+        this(CalculatorClientConfig.builder().host(host).port(port).build());
+    }
+
+    /**
+     * Constructor với cấu hình tùy chỉnh.
+     */
+    public CalculatorClient(CalculatorClientConfig config) {
         this.clientId = UUID.randomUUID().toString().substring(0, 8);
+        this.config = config;
         this.inputValidator = new CalculatorInputValidator();
-        logger.info("[Client-{}] Đang khởi tạo Calculator Client - Host: {}, Port: {}", clientId, host, port);
+        logger.info("[Client-{}] Đang khởi tạo Calculator Client - Host: {}, Port: {}", clientId,
+                config.getHost(), config.getPort());
 
         try {
-            this.channel = ManagedChannelBuilder.forAddress(host, port)
+            this.channel = ManagedChannelBuilder.forAddress(config.getHost(), config.getPort())
                     .usePlaintext()
                     .keepAliveTime(30, TimeUnit.SECONDS)
                     .keepAliveTimeout(5, TimeUnit.SECONDS)
@@ -86,7 +88,7 @@ public class CalculatorClient {
             return new CalculationResult(false, 0.0, "Kết nối đến server không khả dụng.");
         }
 
-        logger.info("[Client-{}] Gửi yêu cầu tính toán: {} {} {}", clientId, operand1, operator, operand2);
+        logger.debug("[Client-{}] Gửi yêu cầu tính toán: {} {} {}", clientId, operand1, operator, operand2);
 
         // Validation chi tiết với thông báo lỗi cụ thể
         CalculatorInputValidator.ValidationResult validationResult =
@@ -128,11 +130,12 @@ public class CalculatorClient {
     private CalculationResult sendCalculationRequestWithRetry(CalculationRequest request) {
         String requestId = request.getRequestId();
         int attempt = 0;
+        int maxAttempts = config.getMaxRetryAttempts();
 
-        while (attempt < MAX_RETRY_ATTEMPTS) {
+        while (attempt < maxAttempts) {
             attempt++;
             logger.debug("[Client-{}] Gửi request ID: {} (Lần thử: {}/{})", 
-                    clientId, requestId, attempt, MAX_RETRY_ATTEMPTS);
+                    clientId, requestId, attempt, maxAttempts);
 
             CalculationResult result = sendCalculationRequest(request);
             
@@ -146,11 +149,11 @@ public class CalculatorClient {
             }
 
             // Nếu cần retry và chưa đạt max attempts
-            if (attempt < MAX_RETRY_ATTEMPTS) {
+            if (attempt < maxAttempts) {
                 logger.warn("[Client-{}] Request ID: {} thất bại, đang retry sau {}ms...", 
-                        clientId, requestId, RETRY_DELAY_MS);
+                        clientId, requestId, config.getRetryDelayMillis());
                 try {
-                    Thread.sleep(RETRY_DELAY_MS * attempt); // Exponential backoff
+                    Thread.sleep(config.getRetryDelayMillis() * attempt); // Exponential backoff
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     logger.error("[Client-{}] Retry bị gián đoạn", clientId);
@@ -160,9 +163,9 @@ public class CalculatorClient {
         }
 
         logger.error("[Client-{}] Request ID: {} thất bại sau {} lần thử", 
-                clientId, requestId, MAX_RETRY_ATTEMPTS);
+                clientId, requestId, maxAttempts);
         return new CalculationResult(false, 0.0, 
-                "Không thể kết nối đến server sau " + MAX_RETRY_ATTEMPTS + " lần thử.");
+                "Không thể kết nối đến server sau " + maxAttempts + " lần thử.");
     }
 
     /**
@@ -190,7 +193,7 @@ public class CalculatorClient {
         try {
             // Gửi request và nhận response với timeout
             CalculationResponse response = blockingStub
-                    .withDeadlineAfter(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .withDeadlineAfter(config.getRequestTimeoutSeconds(), TimeUnit.SECONDS)
                     .calculate(request);
 
             logger.debug("[Client-{}] Nhận được response cho request ID: {}, Success: {}, Result: {}",
@@ -302,7 +305,7 @@ public class CalculatorClient {
                     .build();
 
             HealthCheckResponse response = blockingStub
-                    .withDeadlineAfter(CONNECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .withDeadlineAfter(config.getConnectionTimeoutSeconds(), TimeUnit.SECONDS)
                     .healthCheck(request);
 
             boolean isHealthy = response.getStatus() == HealthCheckResponse.ServingStatus.SERVING;
