@@ -68,6 +68,7 @@ public class CalculatorGUI extends Application {
         // Create UI
         Scene scene = createCalculatorScene();
         scene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleKeyPress);
+        scene.addEventFilter(KeyEvent.KEY_TYPED, this::handleKeyTyped);
         
         // Setup stage
         primaryStage.setTitle("Calculator GUI with gRPC");
@@ -243,11 +244,18 @@ public class CalculatorGUI extends Application {
      * Handle operator input
      */
     private void handleOperatorInput(String op) {
-        if (!operator.isEmpty() && !waitingForOperand) {
+        if (!operator.isEmpty() && waitingForOperand) {
+            operator = convertOperatorSymbol(op);
+            currentInput = op;
+            updateDisplay();
+            return;
+        }
+
+        if (!operator.isEmpty()) {
             handleEquals();
         }
         
-        firstOperand = Double.parseDouble(currentInput);
+        firstOperand = parseCurrentInput();
         operator = convertOperatorSymbol(op);
         waitingForOperand = true;
         
@@ -278,7 +286,7 @@ public class CalculatorGUI extends Application {
         }
         
         try {
-            double secondOperand = Double.parseDouble(currentInput);
+            double secondOperand = parseCurrentInput();
             String currentOperator = operator; // Store operator before reset
             
 
@@ -363,13 +371,6 @@ public class CalculatorGUI extends Application {
      */
     private void handleKeyPress(KeyEvent event) {
         KeyCode code = event.getCode();
-
-        if (code.isDigitKey()) {
-            handleNumberInput(code.getName());
-            event.consume();
-            return;
-        }
-
         switch (code) {
             case ADD, PLUS -> {
                 handleOperatorInput("+");
@@ -408,6 +409,29 @@ public class CalculatorGUI extends Application {
         }
     }
 
+    private void handleKeyTyped(KeyEvent event) {
+        String character = event.getCharacter();
+        if (character == null || character.isBlank()) {
+            return;
+        }
+
+        switch (character) {
+            case "+" -> handleOperatorInput("+");
+            case "-" -> handleOperatorInput("-");
+            case "*" -> handleOperatorInput("×");
+            case "/" -> handleOperatorInput("÷");
+            case "." -> handleDecimalInput();
+            default -> {
+                if (character.matches("[0-9]")) {
+                    handleNumberInput(character);
+                } else {
+                    return;
+                }
+            }
+        }
+        event.consume();
+    }
+
     private void handleBackspace() {
         if (!waitingForOperand && currentInput.length() > 0) {
             currentInput = currentInput.substring(0, currentInput.length() - 1);
@@ -415,6 +439,14 @@ public class CalculatorGUI extends Application {
                 currentInput = "0";
             }
             updateDisplay();
+        }
+    }
+
+    private double parseCurrentInput() {
+        try {
+            return Double.parseDouble(currentInput);
+        } catch (NumberFormatException ex) {
+            return firstOperand;
         }
     }
     
