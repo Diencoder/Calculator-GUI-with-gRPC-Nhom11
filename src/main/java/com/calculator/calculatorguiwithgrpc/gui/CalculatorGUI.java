@@ -4,6 +4,8 @@ import com.calculator.calculatorguiwithgrpc.client.CalculatorClient;
 import com.calculator.calculatorguiwithgrpc.utils.ValidationUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -15,6 +17,8 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.LocalDateTime;
 
 /**
  * Calculator GUI Application using JavaFX
@@ -31,6 +35,10 @@ public class CalculatorGUI extends Application {
     private TextField displayField;
     private CalculatorClient calculatorClient;
     private ValidationUtils validationUtils;
+    private CalculationHistoryLogger historyLogger;
+    private ObservableList<String> historyItems;
+    private ListView<String> historyListView;
+    private static final int HISTORY_LIMIT = 10;
     
     // Calculator state
     private String currentInput = "";
@@ -46,6 +54,8 @@ public class CalculatorGUI extends Application {
         // Initialize components
         calculatorClient = new CalculatorClient();
         validationUtils = new ValidationUtils();
+        historyLogger = new CalculationHistoryLogger();
+        historyItems = FXCollections.observableArrayList();
         
         // Check server health
         if (!calculatorClient.isServerHealthy()) {
@@ -115,8 +125,21 @@ public class CalculatorGUI extends Application {
         statusLabel.setFont(Font.font("Arial", 12));
         statusLabel.setTextFill(Color.GRAY);
         mainLayout.getChildren().add(statusLabel);
+
+        // History section
+        Label historyLabel = new Label("Recent Calculations");
+        historyLabel.setFont(Font.font("Arial", FontWeight.MEDIUM, 14));
+        historyLabel.setTextFill(Color.DARKGRAY);
+        historyLabel.setPadding(new Insets(10, 0, 0, 0));
+
+        historyListView = new ListView<>();
+        historyListView.setItems(historyItems);
+        historyListView.setPrefHeight(150);
+
+        mainLayout.getChildren().add(historyLabel);
+        mainLayout.getChildren().add(historyListView);
         
-        return new Scene(mainLayout, 400, 600);
+        return new Scene(mainLayout, 420, 760);
     }
     
     /**
@@ -267,9 +290,11 @@ public class CalculatorGUI extends Application {
                 waitingForOperand = true;
                 updateDisplay();
                 logger.info("Calculation successful: {} {} {} = {}", firstOperand, currentOperator, secondOperand, result.getResult());
+                recordHistoryEntry(firstOperand, secondOperand, currentOperator, currentInput, true, currentInput);
             } else {
                 showAlert("Calculation Error", result.getErrorMessage());
                 logger.error("Calculation failed: {}", result.getErrorMessage());
+                recordHistoryEntry(firstOperand, secondOperand, currentOperator, "", false, result.getErrorMessage());
             }
             
         } catch (NumberFormatException e) {
@@ -322,6 +347,13 @@ public class CalculatorGUI extends Application {
             return String.format("%.10g", result);
         }
     }
+
+    private String formatOperand(double value) {
+        if (value == (long) value) {
+            return String.valueOf((long) value);
+        }
+        return String.valueOf(value);
+    }
     
     /**
      * Check if text is a number
@@ -370,6 +402,29 @@ public class CalculatorGUI extends Application {
             alert.setContentText(message);
             alert.showAndWait();
         });
+    }
+
+    private void recordHistoryEntry(double first, double second, String op, String resultText, boolean success, String message) {
+        if (op == null || op.isEmpty()) {
+            return;
+        }
+        String expression = String.format("%s %s %s = %s",
+                formatOperand(first),
+                op,
+                formatOperand(second),
+                success ? resultText : "Error");
+        CalculationHistoryEntry entry = new CalculationHistoryEntry(
+                LocalDateTime.now(),
+                expression,
+                success,
+                message
+        );
+
+        historyItems.add(0, entry.toString());
+        if (historyItems.size() > HISTORY_LIMIT) {
+            historyItems.remove(historyItems.size() - 1);
+        }
+        historyLogger.log(entry);
     }
     
     /**
