@@ -19,8 +19,12 @@ public class ValidationUtils {
     // Valid operators for advanced calculations
     private static final Set<String> ADVANCED_OPERATORS = Set.of(
         "+", "-", "*", "/", "%", "^", 
-        "sqrt", "log", "sin", "cos", "tan", 
-        "abs", "ceil", "floor", "round", "max", "min"
+        "sqrt", "cbrt", "nthroot", "exp", "pow",
+        "log", "log10", "ln",
+        "sin", "cos", "tan", "asin", "acos", "atan",
+        "sinh", "cosh", "tanh",
+        "abs", "ceil", "floor", "round", "max", "min",
+        "convertBase"
     );
     
     // Pattern for valid numbers (including decimals and scientific notation)
@@ -148,13 +152,31 @@ public class ValidationUtils {
             errors.append("Modulo by zero is not allowed; ");
         }
         
-        // Check for negative numbers in sqrt and log
+        // Check for negative numbers in sqrt, cbrt, nthroot
         if ("sqrt".equals(operator) && operand1 < 0) {
             errors.append("Square root of negative number is not allowed; ");
         }
         
-        if ("log".equals(operator) && operand1 <= 0) {
+        if ("nthroot".equals(operator) && operand1 < 0 && operand2 % 2 == 0) {
+            errors.append("Even root of negative number is not allowed; ");
+        }
+        
+        // Check for logarithms
+        if (("log".equals(operator) || "ln".equals(operator)) && operand1 <= 0) {
             errors.append("Logarithm of non-positive number is not allowed; ");
+        }
+        
+        if ("log10".equals(operator) && operand1 <= 0) {
+            errors.append("Log base 10 of non-positive number is not allowed; ");
+        }
+        
+        // Check for inverse trigonometric functions domain
+        if ("asin".equals(operator) && (operand1 < -1 || operand1 > 1)) {
+            errors.append("Arcsin domain is [-1, 1]; ");
+        }
+        
+        if ("acos".equals(operator) && (operand1 < -1 || operand1 > 1)) {
+            errors.append("Arccos domain is [-1, 1]; ");
         }
         
         boolean isValid = errors.length() == 0;
