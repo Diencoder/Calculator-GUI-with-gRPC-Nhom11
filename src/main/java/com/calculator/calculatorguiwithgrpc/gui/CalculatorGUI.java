@@ -10,6 +10,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -65,6 +67,7 @@ public class CalculatorGUI extends Application {
         
         // Create UI
         Scene scene = createCalculatorScene();
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleKeyPress);
         
         // Setup stage
         primaryStage.setTitle("Calculator GUI with gRPC");
@@ -353,6 +356,66 @@ public class CalculatorGUI extends Application {
             return String.valueOf((long) value);
         }
         return String.valueOf(value);
+    }
+
+    /**
+     * Handle keyboard events to mimic button clicks.
+     */
+    private void handleKeyPress(KeyEvent event) {
+        KeyCode code = event.getCode();
+
+        if (code.isDigitKey()) {
+            handleNumberInput(code.getName());
+            event.consume();
+            return;
+        }
+
+        switch (code) {
+            case ADD, PLUS -> {
+                handleOperatorInput("+");
+                event.consume();
+            }
+            case SUBTRACT, MINUS -> {
+                handleOperatorInput("-");
+                event.consume();
+            }
+            case MULTIPLY -> {
+                handleOperatorInput("×");
+                event.consume();
+            }
+            case DIVIDE, SLASH -> {
+                handleOperatorInput("÷");
+                event.consume();
+            }
+            case ENTER, EQUALS -> {
+                handleEquals();
+                event.consume();
+            }
+            case BACK_SPACE -> {
+                handleBackspace();
+                event.consume();
+            }
+            case DELETE -> {
+                clearAll();
+                event.consume();
+            }
+            case PERIOD, DECIMAL -> {
+                handleDecimalInput();
+                event.consume();
+            }
+            default -> {
+            }
+        }
+    }
+
+    private void handleBackspace() {
+        if (!waitingForOperand && currentInput.length() > 0) {
+            currentInput = currentInput.substring(0, currentInput.length() - 1);
+            if (currentInput.isEmpty()) {
+                currentInput = "0";
+            }
+            updateDisplay();
+        }
     }
     
     /**
