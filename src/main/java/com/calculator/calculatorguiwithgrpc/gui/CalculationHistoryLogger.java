@@ -1,5 +1,6 @@
 package com.calculator.calculatorguiwithgrpc.gui;
 
+import com.calculator.calculatorguiwithgrpc.config.AppConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,10 +15,11 @@ import java.nio.file.StandardOpenOption;
 public class CalculationHistoryLogger {
 
     private static final Logger logger = LoggerFactory.getLogger(CalculationHistoryLogger.class);
+    private static final AppConfig appConfig = AppConfig.getInstance();
     private final Path logFile;
 
     public CalculationHistoryLogger() {
-        this(Path.of("logs", "calculation-history.log"));
+        this(Path.of(appConfig.getLoggingHistoryFile()));
     }
 
     public CalculationHistoryLogger(Path logFile) {

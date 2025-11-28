@@ -1,7 +1,10 @@
 package com.calculator.calculatorguiwithgrpc.client;
 
+import com.calculator.calculatorguiwithgrpc.config.AppConfig;
+
 /**
  * Immutable configuration for {@link CalculatorClient}.
+ * Loads default values from application.properties if not specified.
  */
 public class CalculatorClientConfig {
 
@@ -50,12 +53,13 @@ public class CalculatorClientConfig {
     }
 
     public static final class Builder {
-        private String host = "localhost";
-        private int port = 9090;
-        private long requestTimeoutSeconds = 10;
-        private long connectionTimeoutSeconds = 5;
-        private int maxRetryAttempts = 3;
-        private long retryDelayMillis = 500;
+        private final AppConfig appConfig = AppConfig.getInstance();
+        private String host = appConfig.getClientHost();
+        private int port = appConfig.getClientPort();
+        private long requestTimeoutSeconds = appConfig.getClientRequestTimeoutSeconds();
+        private long connectionTimeoutSeconds = appConfig.getClientConnectionTimeoutSeconds();
+        private int maxRetryAttempts = appConfig.getClientMaxRetryAttempts();
+        private long retryDelayMillis = appConfig.getClientRetryDelayMillis();
 
         private Builder() {
         }

@@ -1,5 +1,6 @@
 package com.calculator.calculatorguiwithgrpc.client;
 
+import com.calculator.calculatorguiwithgrpc.config.AppConfig;
 import com.calculator.calculatorguiwithgrpc.proto.CalculatorProtos.*;
 import com.calculator.calculatorguiwithgrpc.proto.CalculatorServiceGrpc;
 import io.grpc.*;
@@ -54,10 +55,11 @@ public class CalculatorClient {
                 config.getHost(), config.getPort());
 
         try {
+            AppConfig appConfig = AppConfig.getInstance();
             this.channel = ManagedChannelBuilder.forAddress(config.getHost(), config.getPort())
                     .usePlaintext()
-                    .keepAliveTime(30, TimeUnit.SECONDS)
-                    .keepAliveTimeout(5, TimeUnit.SECONDS)
+                    .keepAliveTime(appConfig.getClientKeepAliveTimeSeconds(), TimeUnit.SECONDS)
+                    .keepAliveTimeout(appConfig.getClientKeepAliveTimeoutSeconds(), TimeUnit.SECONDS)
                     .keepAliveWithoutCalls(true)
                     .build();
 
@@ -109,6 +111,20 @@ public class CalculatorClient {
 
         // Gửi request với retry mechanism
         return sendCalculationRequestWithRetry(request);
+    }
+
+    /**
+     * API thân thiện cho GUI: phép toán cơ bản.
+     */
+    public CalculationResult calculate(double operand1, double operand2, String operator) {
+        return performCalculation(operand1, operand2, operator);
+    }
+
+    /**
+     * API thân thiện cho GUI: phép toán nâng cao (tạm thời dùng chung service).
+     */
+    public CalculationResult calculateAdvanced(double operand1, double operand2, String operator) {
+        return performCalculation(operand1, operand2, operator);
     }
 
     /**

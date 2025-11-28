@@ -1,5 +1,6 @@
 package com.calculator.calculatorguiwithgrpc.client;
 
+import com.calculator.calculatorguiwithgrpc.config.AppConfig;
 import com.calculator.calculatorguiwithgrpc.utils.ValidationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,12 +12,18 @@ import org.slf4j.LoggerFactory;
 public class CalculatorInputValidator {
 
     private static final Logger logger = LoggerFactory.getLogger(CalculatorInputValidator.class);
+    private static final AppConfig appConfig = AppConfig.getInstance();
 
-    private static final double MAX_SAFE_VALUE = 1e15;  // Giá trị tối đa an toàn
-    private static final double MIN_SAFE_VALUE = -1e15; // Giá trị tối thiểu an toàn
-    private static final double MAX_EXPONENT = 1000;    // Số mũ tối đa cho phép
-
+    private final double maxSafeValue;
+    private final double minSafeValue;
+    private final double maxExponent;
     private final ValidationUtils validationUtils = new ValidationUtils();
+    
+    public CalculatorInputValidator() {
+        this.maxSafeValue = appConfig.getValidationMaxSafeValue();
+        this.minSafeValue = appConfig.getValidationMinSafeValue();
+        this.maxExponent = appConfig.getValidationMaxExponent();
+    }
 
     /**
      * Validate inputs for calculator operations.
@@ -76,14 +83,14 @@ public class CalculatorInputValidator {
             return operandName + " không được là vô cực (Infinity).";
         }
 
-        if (operand > MAX_SAFE_VALUE) {
+        if (operand > maxSafeValue) {
             logger.debug("{} quá lớn: {}", operandName, operand);
-            return operandName + " quá lớn (>" + MAX_SAFE_VALUE + ").";
+            return operandName + " quá lớn (>" + maxSafeValue + ").";
         }
 
-        if (operand < MIN_SAFE_VALUE) {
+        if (operand < minSafeValue) {
             logger.debug("{} quá nhỏ: {}", operandName, operand);
-            return operandName + " quá nhỏ (<" + MIN_SAFE_VALUE + ").";
+            return operandName + " quá nhỏ (<" + minSafeValue + ").";
         }
 
         return null; // Hợp lệ
@@ -106,9 +113,9 @@ public class CalculatorInputValidator {
                 break;
 
             case "^":
-                if (Math.abs(operand2) > MAX_EXPONENT) {
+                if (Math.abs(operand2) > maxExponent) {
                     logger.debug("Số mũ quá lớn: {}", operand2);
-                    return "Số mũ quá lớn (|" + operand2 + "| > " + MAX_EXPONENT + ").";
+                    return "Số mũ quá lớn (|" + operand2 + "| > " + maxExponent + ").";
                 }
                 if (operand1 < 0 && operand2 != (long) operand2) {
                     logger.debug("Cơ số âm với số mũ không nguyên: {} ^ {}", operand1, operand2);

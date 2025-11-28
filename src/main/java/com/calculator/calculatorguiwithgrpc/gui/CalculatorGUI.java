@@ -1,6 +1,7 @@
 package com.calculator.calculatorguiwithgrpc.gui;
 
 import com.calculator.calculatorguiwithgrpc.client.CalculatorClient;
+import com.calculator.calculatorguiwithgrpc.config.AppConfig;
 import com.calculator.calculatorguiwithgrpc.utils.ValidationUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -10,6 +11,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -28,6 +31,7 @@ import org.slf4j.LoggerFactory;
 public class CalculatorGUI extends Application {
 
     private static final Logger logger = LoggerFactory.getLogger(CalculatorGUI.class);
+    private static final AppConfig appConfig = AppConfig.getInstance();
 
     private TextField displayField; // Màn hình hiển thị chính
     private Label expressionLabel; // Hiển thị biểu thức (ví dụ: "8 × 9 =")
@@ -35,6 +39,7 @@ public class CalculatorGUI extends Application {
     private ListView<String> historyListView;
     private CalculatorClient calculatorClient;
     private ValidationUtils validationUtils;
+    private final int maxHistoryEntries = appConfig.getGuiHistoryMaxEntries();
 
     private String currentInput = "0";
     private String operator = "";
@@ -43,6 +48,11 @@ public class CalculatorGUI extends Application {
     private boolean waitingForOperand = false;
     private String currentMode = "Chuẩn"; // Chuẩn, Khoa học, Lập trình viên
     private ObservableList<String> calculationHistory = FXCollections.observableArrayList();
+    
+    private final int windowWidth = appConfig.getGuiWindowWidth();
+    private final int windowHeight = appConfig.getGuiWindowHeight();
+    private final double buttonWidth = Math.max(70, windowWidth / 12.0);
+    private final double buttonHeight = Math.max(55, windowHeight / 10.0);
     
     // UI Components
     private GridPane calculatorPad;
@@ -62,6 +72,7 @@ public class CalculatorGUI extends Application {
 
         Scene scene = createCalculatorScene();
         scene.getStylesheets().add(getClass().getResource("/css/calculator.css").toExternalForm());
+        setupKeyboardShortcuts(scene);
 
         primaryStage.setTitle("Calculator GUI with gRPC");
         primaryStage.setScene(scene);
@@ -88,12 +99,12 @@ public class CalculatorGUI extends Application {
 
         // === PHẦN GIỮA: Display và Bàn phím ===
         VBox centerPanel = new VBox(0);
-        centerPanel.setPadding(new Insets(20));
-        centerPanel.setSpacing(15);
+        centerPanel.setPadding(new Insets(15));
+        centerPanel.setSpacing(12);
 
         // Display Section - Giống máy tính Microsoft
         VBox displaySection = new VBox(0);
-        displaySection.setStyle("-fx-background-color: #1e1e1e; -fx-background-radius: 0; -fx-padding: 20;");
+        displaySection.setStyle("-fx-background-color: #1e1e1e; -fx-background-radius: 0; -fx-padding: 15;");
         
         // Expression label (hiển thị biểu thức như "8 × 9 =")
         expressionLabel = new Label("");
@@ -108,8 +119,9 @@ public class CalculatorGUI extends Application {
         displayField = new TextField("0");
         displayField.setEditable(false);
         displayField.setAlignment(Pos.CENTER_RIGHT);
-        displayField.setPrefHeight(100);
-        displayField.setFont(Font.font("Segoe UI", FontWeight.BOLD, 48));
+        displayField.setPrefHeight(Math.max(70, windowHeight * 0.12));
+        int displayFontSize = appConfig.getGuiDisplayFontSize();
+        displayField.setFont(Font.font("Segoe UI", FontWeight.BOLD, displayFontSize));
         displayField.setStyle("-fx-background-color: #1e1e1e; -fx-text-fill: white; -fx-border-width: 0; -fx-padding: 10 0 10 0;");
         displayField.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(displayField, Priority.ALWAYS);
@@ -130,14 +142,15 @@ public class CalculatorGUI extends Application {
 
         // === PHẦN BÊN PHẢI: Tab Lịch sử và Bộ nhớ ===
         VBox rightPanel = createRightPanel();
-        rightPanel.setPrefWidth(320);
+        int rightPanelWidth = Math.max(220, (int) (windowWidth * 0.22));
+        rightPanel.setPrefWidth(rightPanelWidth);
         rightPanel.setStyle("-fx-background-color: white;");
 
         // Gắn các panel vào BorderPane
         mainLayout.setCenter(centerPanel);
         mainLayout.setRight(rightPanel);
 
-        return new Scene(mainLayout, 1200, 750);
+        return new Scene(mainLayout, windowWidth, windowHeight);
     }
     
     /**
@@ -184,7 +197,8 @@ public class CalculatorGUI extends Application {
         
         // Content area
         StackPane contentArea = new StackPane();
-        contentArea.setPrefHeight(650);
+        double contentHeight = Math.max(420, windowHeight - 120);
+        contentArea.setPrefHeight(contentHeight);
         contentArea.setStyle("-fx-background-color: white;");
         
         // History panel
@@ -193,7 +207,7 @@ public class CalculatorGUI extends Application {
         historyPanel.setVisible(true);
         
         historyListView = new ListView<>(calculationHistory);
-        historyListView.setPrefHeight(580);
+        historyListView.setPrefHeight(Math.max(300, contentHeight - 90));
         historyListView.getStyleClass().add("list-view");
         historyListView.setStyle("-fx-font-size: 13px; -fx-background-color: white;");
         
@@ -245,7 +259,8 @@ public class CalculatorGUI extends Application {
      */
     private VBox createModeMenu() {
         VBox menu = new VBox(0);
-        menu.setPrefWidth(200);
+        int sideMenuWidth = Math.max(190, (int) (windowWidth * 0.2));
+        menu.setPrefWidth(sideMenuWidth);
         menu.setStyle("-fx-background-color: #2d2d30;");
         
         // Header với icon hamburger
@@ -292,9 +307,10 @@ public class CalculatorGUI extends Application {
     private Button createModeButton(String text, String mode) {
         Button button = new Button(text);
         button.setPrefWidth(Double.MAX_VALUE);
-        button.setPrefHeight(55);
+        double modeButtonHeight = Math.max(40, windowHeight / 13.0);
+        button.setPrefHeight(modeButtonHeight);
         button.setAlignment(Pos.CENTER_LEFT);
-        button.setPadding(new Insets(15, 20, 15, 20));
+        button.setPadding(new Insets(12, 18, 12, 18));
         button.setFont(Font.font("Segoe UI", 14));
         button.setTextFill(Color.WHITE);
         button.setStyle("-fx-background-color: #2d2d30; -fx-background-radius: 0; -fx-border-width: 0;");
@@ -566,7 +582,7 @@ public class CalculatorGUI extends Application {
      */
     private Button createNumberButton(String text) {
         Button button = new Button(text);
-        button.setPrefSize(75, 60);
+        button.setPrefSize(buttonWidth, buttonHeight);
         button.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
         button.setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-background-radius: 0; -fx-border-color: #e0e0e0; -fx-border-width: 1;");
         
@@ -581,7 +597,7 @@ public class CalculatorGUI extends Application {
      */
     private Button createOperatorButton(String text) {
         Button button = new Button(text);
-        button.setPrefSize(75, 60);
+        button.setPrefSize(buttonWidth, buttonHeight);
         button.setFont(Font.font("Segoe UI", FontWeight.BOLD, 20));
         button.setStyle("-fx-background-color: #f0f0f0; -fx-text-fill: black; -fx-background-radius: 0; -fx-border-color: #e0e0e0; -fx-border-width: 1;");
         
@@ -596,7 +612,7 @@ public class CalculatorGUI extends Application {
      */
     private Button createFunctionButton(String text) {
         Button button = new Button(text);
-        button.setPrefSize(75, 60);
+        button.setPrefSize(buttonWidth, buttonHeight);
         button.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
         button.setStyle("-fx-background-color: #f0f0f0; -fx-text-fill: black; -fx-background-radius: 0; -fx-border-color: #e0e0e0; -fx-border-width: 1;");
         
@@ -641,7 +657,7 @@ public class CalculatorGUI extends Application {
      */
     private Button createAdvancedButton(String text) {
         Button button = new Button(text);
-        button.setPrefSize(75, 60);
+        button.setPrefSize(buttonWidth, buttonHeight);
         button.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
         button.setStyle("-fx-background-color: #f0f0f0; -fx-text-fill: black; -fx-background-radius: 0; -fx-border-color: #e0e0e0; -fx-border-width: 1;");
         
@@ -656,7 +672,7 @@ public class CalculatorGUI extends Application {
      */
     private Button createBaseButton(String text, int base) {
         Button button = new Button(text);
-        button.setPrefSize(75, 60);
+        button.setPrefSize(buttonWidth, buttonHeight);
         button.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
         button.setStyle("-fx-background-color: #f0f0f0; -fx-text-fill: black; -fx-background-radius: 0; -fx-border-color: #e0e0e0; -fx-border-width: 1;");
         
@@ -671,7 +687,7 @@ public class CalculatorGUI extends Application {
      */
     private Button createHexButton(String text) {
         Button button = new Button(text);
-        button.setPrefSize(75, 60);
+        button.setPrefSize(buttonWidth, buttonHeight);
         button.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
         button.setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-background-radius: 0; -fx-border-color: #e0e0e0; -fx-border-width: 1;");
         
@@ -991,7 +1007,7 @@ public class CalculatorGUI extends Application {
      */
     private void addToHistory(String entry) {
         calculationHistory.add(0, entry);
-        if (calculationHistory.size() > 100) {
+        if (calculationHistory.size() > maxHistoryEntries) {
             calculationHistory.remove(calculationHistory.size() - 1);
         }
     }
@@ -1139,6 +1155,58 @@ public class CalculatorGUI extends Application {
      */
     private void showAlert(String title, String message) {
         showError(title, message);
+    }
+
+    /**
+     * Thiết lập phím tắt bàn phím (nhập số, phép toán, điều khiển)
+     */
+    private void setupKeyboardShortcuts(Scene scene) {
+        scene.addEventFilter(KeyEvent.KEY_TYPED, this::handleKeyTyped);
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleKeyPressed);
+    }
+
+    private void handleKeyTyped(KeyEvent event) {
+        String ch = event.getCharacter();
+        if (ch == null || ch.isBlank()) {
+            return;
+        }
+
+        switch (ch) {
+            case "+" -> handleOperatorInput("+");
+            case "-" -> handleOperatorInput("-");
+            case "*" -> handleOperatorInput("×");
+            case "/" -> handleOperatorInput("÷");
+            case "=" -> handleEquals();
+            case "." -> handleNumberInput(".");
+            default -> {
+                if (ch.matches("[0-9]")) {
+                    handleNumberInput(ch);
+                } else {
+                    return;
+                }
+            }
+        }
+        event.consume();
+    }
+
+    private void handleKeyPressed(KeyEvent event) {
+        KeyCode code = event.getCode();
+
+        switch (code) {
+            case ENTER, EQUALS -> handleEquals();
+            case BACK_SPACE -> handleBackspace();
+            case DELETE -> handleClearEntry();
+            case ESCAPE -> clearAll();
+            case ADD -> handleOperatorInput("+");
+            case SUBTRACT -> handleOperatorInput("-");
+            case MULTIPLY -> handleOperatorInput("×");
+            case DIVIDE -> handleOperatorInput("÷");
+            case DECIMAL -> handleNumberInput(".");
+            default -> {
+                return;
+            }
+        }
+        event.consume();
     }
 
     public static void main(String[] args) {
