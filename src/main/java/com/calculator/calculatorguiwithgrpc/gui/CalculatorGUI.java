@@ -49,6 +49,11 @@ public class CalculatorGUI extends Application {
     private String currentMode = "Chuẩn"; // Chuẩn, Khoa học, Lập trình viên
     private ObservableList<String> calculationHistory = FXCollections.observableArrayList();
     
+    // Memory functions - Hỗ trợ nhiều memory slots
+    private final java.util.Map<Integer, Double> memorySlots = new java.util.HashMap<>();
+    private int currentMemorySlot = 0;
+    private ListView<String> memoryListView;
+    
     private final int windowWidth = appConfig.getGuiWindowWidth();
     private final int windowHeight = appConfig.getGuiWindowHeight();
     private final double buttonWidth = Math.max(70, windowWidth / 12.0);
@@ -220,15 +225,71 @@ public class CalculatorGUI extends Application {
         
         historyPanel.getChildren().addAll(historyListView, clearHistoryButton);
         
-        // Memory panel (placeholder)
+        // Memory panel - Cải thiện với danh sách memory slots
         VBox memoryPanel = new VBox(10);
         memoryPanel.setPadding(new Insets(15));
         memoryPanel.setVisible(false);
         
-        Label memoryLabel = new Label("Chưa có bộ nhớ.");
-        memoryLabel.setFont(Font.font("Segoe UI", 13));
-        memoryLabel.setTextFill(Color.GRAY);
-        memoryPanel.getChildren().add(memoryLabel);
+        Label memoryTitleLabel = new Label("Bộ nhớ");
+        memoryTitleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        memoryTitleLabel.setTextFill(Color.rgb(0, 120, 212));
+        
+        // Danh sách memory slots
+        ObservableList<String> memoryList = FXCollections.observableArrayList();
+        memoryListView = new ListView<>(memoryList);
+        memoryListView.setPrefHeight(Math.max(200, contentHeight - 200));
+        memoryListView.getStyleClass().add("list-view");
+        memoryListView.setStyle("-fx-font-size: 13px; -fx-background-color: white;");
+        memoryListView.setCellFactory(listView -> new ListCell<String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    setText(item);
+                    setStyle("-fx-padding: 5px;");
+                }
+            }
+        });
+        
+        // Memory buttons - Hàng 1
+        HBox memoryButtonsRow1 = new HBox(5);
+        memoryButtonsRow1.setSpacing(5);
+        
+        Button msButton = createMemoryButton("MS", () -> handleMemoryStore());
+        Button mrButton = createMemoryButton("MR", () -> handleMemoryRecall());
+        Button mcButton = createMemoryButton("MC", () -> handleMemoryClear());
+        
+        memoryButtonsRow1.getChildren().addAll(msButton, mrButton, mcButton);
+        
+        // Memory buttons - Hàng 2
+        HBox memoryButtonsRow2 = new HBox(5);
+        memoryButtonsRow2.setSpacing(5);
+        
+        Button mPlusButton = createMemoryButton("M+", () -> handleMemoryAdd());
+        Button mMinusButton = createMemoryButton("M-", () -> handleMemorySubtract());
+        Button mSelectButton = createMemoryButton("M", () -> handleMemorySelect());
+        
+        memoryButtonsRow2.getChildren().addAll(mPlusButton, mMinusButton, mSelectButton);
+        
+        // Nút xóa tất cả memory
+        Button clearAllMemoryButton = new Button("Xóa tất cả");
+        clearAllMemoryButton.setPrefWidth(Double.MAX_VALUE);
+        clearAllMemoryButton.setPrefHeight(35);
+        clearAllMemoryButton.setFont(Font.font("Segoe UI", 12));
+        clearAllMemoryButton.setStyle("-fx-background-color: #e81123; -fx-text-fill: white; -fx-background-radius: 3;");
+        clearAllMemoryButton.setOnAction(e -> handleClearAllMemory());
+        HBox.setHgrow(clearAllMemoryButton, Priority.ALWAYS);
+        
+        memoryPanel.getChildren().addAll(
+            memoryTitleLabel, 
+            memoryListView, 
+            memoryButtonsRow1, 
+            memoryButtonsRow2,
+            clearAllMemoryButton
+        );
         
         contentArea.getChildren().addAll(historyPanel, memoryPanel);
         
@@ -252,6 +313,168 @@ public class CalculatorGUI extends Application {
     private void showMemoryPanel() {
         historyPanel.setVisible(false);
         memoryPanel.setVisible(true);
+        updateMemoryDisplay();
+    }
+    
+    /**
+     * Tạo nút Memory
+     */
+    private Button createMemoryButton(String text, Runnable action) {
+        Button button = new Button();
+        button.setPrefWidth(60);
+        button.setPrefHeight(30);
+        button.setMinWidth(50);
+        button.setMinHeight(30);
+        button.setMaxWidth(80);
+        button.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10));
+        button.setAlignment(Pos.CENTER);
+        button.setContentDisplay(javafx.scene.control.ContentDisplay.CENTER);
+        button.setStyle("-fx-background-color: #0078d4; -fx-text-fill: white; -fx-background-radius: 5; -fx-border-width: 0; -fx-padding: 2px 5px;");
+        button.setText(text);
+        button.setWrapText(false);
+        button.setOnAction(e -> action.run());
+        button.setOnMouseEntered(e -> button.setStyle("-fx-background-color: #106ebe; -fx-text-fill: white; -fx-background-radius: 5; -fx-border-width: 0; -fx-padding: 2px 5px;"));
+        button.setOnMouseExited(e -> button.setStyle("-fx-background-color: #0078d4; -fx-text-fill: white; -fx-background-radius: 5; -fx-border-width: 0; -fx-padding: 2px 5px;"));
+        return button;
+    }
+    
+    /**
+     * Cập nhật hiển thị danh sách memory
+     */
+    private void updateMemoryDisplay() {
+        if (memoryListView != null) {
+            ObservableList<String> memoryList = memoryListView.getItems();
+            memoryList.clear();
+            
+            if (memorySlots.isEmpty()) {
+                memoryList.add("Chưa có bộ nhớ nào được lưu");
+            } else {
+                memorySlots.entrySet().stream()
+                    .sorted(java.util.Map.Entry.comparingByKey())
+                    .forEach(entry -> {
+                        int slot = entry.getKey();
+                        double value = entry.getValue();
+                        String marker = (slot == currentMemorySlot) ? "→ " : "  ";
+                        memoryList.add(marker + "M" + slot + " = " + formatNumber(value));
+                    });
+            }
+        }
+    }
+    
+    /**
+     * Memory Store - Lưu giá trị hiện tại vào memory slot hiện tại
+     */
+    private void handleMemoryStore() {
+        try {
+            double value = Double.parseDouble(currentInput);
+            memorySlots.put(currentMemorySlot, value);
+            updateMemoryDisplay();
+            updateStatus("Đã lưu vào M" + currentMemorySlot + ": " + formatNumber(value), Color.GREEN);
+            logger.info("Memory stored in M{}: {}", currentMemorySlot, value);
+        } catch (NumberFormatException e) {
+            showError("Lỗi", "Số không hợp lệ");
+        }
+    }
+    
+    /**
+     * Memory Recall - Lấy giá trị từ memory slot hiện tại
+     */
+    private void handleMemoryRecall() {
+        if (!memorySlots.containsKey(currentMemorySlot)) {
+            showError("Lỗi", "Bộ nhớ M" + currentMemorySlot + " trống");
+            return;
+        }
+        
+        double value = memorySlots.get(currentMemorySlot);
+        currentInput = formatNumber(value);
+        updateDisplay();
+        updateStatus("Đã lấy từ M" + currentMemorySlot + ": " + formatNumber(value), Color.BLUE);
+        logger.info("Memory recalled from M{}: {}", currentMemorySlot, value);
+    }
+    
+    /**
+     * Memory Clear - Xóa memory slot hiện tại
+     */
+    private void handleMemoryClear() {
+        if (memorySlots.remove(currentMemorySlot) != null) {
+            updateMemoryDisplay();
+            updateStatus("Đã xóa M" + currentMemorySlot, Color.GRAY);
+            logger.info("Memory cleared: M{}", currentMemorySlot);
+        } else {
+            updateStatus("M" + currentMemorySlot + " đã trống", Color.GRAY);
+        }
+    }
+    
+    /**
+     * Memory Add - Cộng giá trị hiện tại vào memory slot hiện tại
+     */
+    private void handleMemoryAdd() {
+        try {
+            double value = Double.parseDouble(currentInput);
+            double currentMemory = memorySlots.getOrDefault(currentMemorySlot, 0.0);
+            double newValue = currentMemory + value;
+            memorySlots.put(currentMemorySlot, newValue);
+            updateMemoryDisplay();
+            updateStatus("M" + currentMemorySlot + " += " + formatNumber(value) + " = " + formatNumber(newValue), Color.GREEN);
+            logger.info("Memory add to M{}: {} (new value: {})", currentMemorySlot, value, newValue);
+        } catch (NumberFormatException e) {
+            showError("Lỗi", "Số không hợp lệ");
+        }
+    }
+    
+    /**
+     * Memory Subtract - Trừ giá trị hiện tại từ memory slot hiện tại
+     */
+    private void handleMemorySubtract() {
+        try {
+            double value = Double.parseDouble(currentInput);
+            double currentMemory = memorySlots.getOrDefault(currentMemorySlot, 0.0);
+            double newValue = currentMemory - value;
+            memorySlots.put(currentMemorySlot, newValue);
+            updateMemoryDisplay();
+            updateStatus("M" + currentMemorySlot + " -= " + formatNumber(value) + " = " + formatNumber(newValue), Color.GREEN);
+            logger.info("Memory subtract from M{}: {} (new value: {})", currentMemorySlot, value, newValue);
+        } catch (NumberFormatException e) {
+            showError("Lỗi", "Số không hợp lệ");
+        }
+    }
+    
+    /**
+     * Memory Select - Chọn memory slot (0-9)
+     */
+    private void handleMemorySelect() {
+        TextInputDialog dialog = new TextInputDialog(String.valueOf(currentMemorySlot));
+        dialog.setTitle("Chọn Bộ nhớ");
+        dialog.setHeaderText("Nhập số bộ nhớ (0-9):");
+        dialog.setContentText("Bộ nhớ:");
+        
+        dialog.showAndWait().ifPresent(input -> {
+            try {
+                int slot = Integer.parseInt(input.trim());
+                if (slot >= 0 && slot <= 9) {
+                    currentMemorySlot = slot;
+                    updateMemoryDisplay();
+                    updateStatus("Đã chọn M" + currentMemorySlot, Color.BLUE);
+                    logger.info("Memory slot selected: M{}", currentMemorySlot);
+                } else {
+                    showError("Lỗi", "Số bộ nhớ phải từ 0 đến 9");
+                }
+            } catch (NumberFormatException e) {
+                showError("Lỗi", "Số không hợp lệ");
+            }
+        });
+    }
+    
+    /**
+     * Xóa tất cả memory slots
+     */
+    private void handleClearAllMemory() {
+        int count = memorySlots.size();
+        memorySlots.clear();
+        currentMemorySlot = 0;
+        updateMemoryDisplay();
+        updateStatus("Đã xóa " + count + " bộ nhớ", Color.GRAY);
+        logger.info("All memory cleared ({} slots)", count);
     }
     
     /**
@@ -464,12 +687,12 @@ public class CalculatorGUI extends Application {
         calculatorPad.add(createFunctionButton("C"), 4, 0);
         calculatorPad.add(createFunctionButton("⌫"), 5, 0);
         
-        // Hàng 2: asin, acos, atan, log, ln, ÷
+        // Hàng 2: asin, acos, atan, log, log10, ÷
         calculatorPad.add(createAdvancedButton("asin"), 0, 1);
         calculatorPad.add(createAdvancedButton("acos"), 1, 1);
         calculatorPad.add(createAdvancedButton("atan"), 2, 1);
         calculatorPad.add(createAdvancedButton("log"), 3, 1);
-        calculatorPad.add(createAdvancedButton("ln"), 4, 1);
+        calculatorPad.add(createAdvancedButton("log10"), 4, 1);
         calculatorPad.add(createOperatorButton("÷"), 5, 1);
         
         // Hàng 3: sinh, cosh, tanh, exp, x^y, ×
@@ -480,34 +703,34 @@ public class CalculatorGUI extends Application {
         calculatorPad.add(createAdvancedButton("x^y"), 4, 2);
         calculatorPad.add(createOperatorButton("×"), 5, 2);
         
-        // Hàng 4: √x, ³√x, x², 1/x, %, -
+        // Hàng 4: √x, ³√x, nthroot, x², 1/x, -
         calculatorPad.add(createAdvancedButton("√x"), 0, 3);
         calculatorPad.add(createAdvancedButton("³√x"), 1, 3);
-        calculatorPad.add(createAdvancedButton("x²"), 2, 3);
-        calculatorPad.add(createFunctionButton("1/x"), 3, 3);
-        calculatorPad.add(createFunctionButton("%"), 4, 3);
+        calculatorPad.add(createAdvancedButton("nthroot"), 2, 3);
+        calculatorPad.add(createAdvancedButton("x²"), 3, 3);
+        calculatorPad.add(createFunctionButton("1/x"), 4, 3);
         calculatorPad.add(createOperatorButton("-"), 5, 3);
         
-        // Hàng 5: 7, 8, 9, +, ±, (
+        // Hàng 5: 7, 8, 9, +, ±, %
         calculatorPad.add(createNumberButton("7"), 0, 4);
         calculatorPad.add(createNumberButton("8"), 1, 4);
         calculatorPad.add(createNumberButton("9"), 2, 4);
         calculatorPad.add(createOperatorButton("+"), 3, 4);
         calculatorPad.add(createFunctionButton("±"), 4, 4);
-        calculatorPad.add(createFunctionButton("("), 5, 4);
+        calculatorPad.add(createFunctionButton("%"), 5, 4);
         
-        // Hàng 6: 4, 5, 6, ), ., =
+        // Hàng 6: 4, 5, 6, ., =, ln
         calculatorPad.add(createNumberButton("4"), 0, 5);
         calculatorPad.add(createNumberButton("5"), 1, 5);
         calculatorPad.add(createNumberButton("6"), 2, 5);
-        calculatorPad.add(createFunctionButton(")"), 3, 5);
-        calculatorPad.add(createNumberButton("."), 4, 5);
+        calculatorPad.add(createNumberButton("."), 3, 5);
         Button btnEquals = createOperatorButton("=");
         btnEquals.setStyle("-fx-background-color: #0078d4; -fx-text-fill: white; -fx-background-radius: 0; -fx-border-color: #0078d4; -fx-border-width: 1;");
         btnEquals.setOnMouseEntered(e -> btnEquals.setStyle("-fx-background-color: #106ebe; -fx-text-fill: white; -fx-background-radius: 0; -fx-border-color: #106ebe; -fx-border-width: 1;"));
         btnEquals.setOnMouseExited(e -> btnEquals.setStyle("-fx-background-color: #0078d4; -fx-text-fill: white; -fx-background-radius: 0; -fx-border-color: #0078d4; -fx-border-width: 1;"));
         btnEquals.setOnAction(e -> handleEquals());
-        calculatorPad.add(btnEquals, 5, 5);
+        calculatorPad.add(btnEquals, 4, 5);
+        calculatorPad.add(createAdvancedButton("ln"), 5, 5);
         
         // Hàng 7: 1, 2, 3, 0
         calculatorPad.add(createNumberButton("1"), 0, 6);
@@ -647,6 +870,24 @@ public class CalculatorGUI extends Application {
             case "(":
             case ")":
                 // Placeholder for future implementation
+                break;
+            case "AND":
+                button.setOnAction(e -> handleBitwiseOperation("AND"));
+                break;
+            case "OR":
+                button.setOnAction(e -> handleBitwiseOperation("OR"));
+                break;
+            case "XOR":
+                button.setOnAction(e -> handleBitwiseOperation("XOR"));
+                break;
+            case "NOT":
+                button.setOnAction(e -> handleBitwiseOperation("NOT"));
+                break;
+            case "LSH":
+                button.setOnAction(e -> handleBitwiseOperation("LSH"));
+                break;
+            case "RSH":
+                button.setOnAction(e -> handleBitwiseOperation("RSH"));
                 break;
         }
         return button;
@@ -851,6 +1092,16 @@ public class CalculatorGUI extends Application {
                 return;
             }
             
+            if ("nthroot".equals(function)) {
+                // Cần toán hạng thứ 2 (bậc căn)
+                firstOperand = value;
+                operator = "nthroot";
+                waitingForOperand = true;
+                expression = formatNumber(value) + " nthroot ";
+                expressionLabel.setText(expression);
+                return;
+            }
+            
             // Xử lý các hàm một toán hạng
             String operator = switch (function) {
                 case "sin" -> "sin";
@@ -880,15 +1131,53 @@ public class CalculatorGUI extends Application {
     }
     
     /**
+     * Xử lý bitwise operations (Lập trình viên)
+     */
+    private void handleBitwiseOperation(String op) {
+        try {
+            double value = Double.parseDouble(currentInput);
+            
+            if ("NOT".equals(op)) {
+                // NOT là unary operation
+                performAdvancedCalculation(value, 0, "NOT");
+            } else {
+                // AND, OR, XOR, LSH, RSH cần toán hạng thứ 2
+                firstOperand = value;
+                operator = op;
+                waitingForOperand = true;
+                String displayOp = switch (op) {
+                    case "AND" -> " & ";
+                    case "OR" -> " | ";
+                    case "XOR" -> " ^ ";
+                    case "LSH" -> " << ";
+                    case "RSH" -> " >> ";
+                    default -> " " + op + " ";
+                };
+                expression = formatNumber(value) + displayOp;
+                expressionLabel.setText(expression);
+            }
+        } catch (NumberFormatException e) {
+            showError("Lỗi", "Số không hợp lệ");
+        }
+    }
+    
+    /**
      * Xử lý chuyển đổi hệ cơ số (Lập trình viên)
      */
     private void handleBaseConversion(int toBase) {
         try {
             // Giả sử số hiện tại ở hệ thập phân, chuyển sang hệ cơ số khác
             long value = Long.parseLong(currentInput.split("\\.")[0]);
+            String baseName = switch (toBase) {
+                case 2 -> "BIN";
+                case 8 -> "OCT";
+                case 10 -> "DEC";
+                case 16 -> "HEX";
+                default -> String.valueOf(toBase);
+            };
             String result = Long.toString(value, toBase).toUpperCase();
             currentInput = result;
-            expression = "DEC(" + value + ") = " + toBase + "(" + result + ")";
+            expression = "DEC(" + value + ") = " + baseName + "(" + result + ")";
             expressionLabel.setText(expression);
             updateDisplay();
             addToHistory(expression);
@@ -928,7 +1217,15 @@ public class CalculatorGUI extends Application {
                     if (result.isSuccess()) {
                         currentInput = formatResult(result.getResult());
                         String funcName = getFunctionDisplayName(op);
-                        expression = funcName + "(" + formatNumber(op1) + ") =";
+                        // Xử lý hiển thị cho các loại hàm khác nhau
+                        if (op.equals("AND") || op.equals("OR") || op.equals("XOR") || 
+                            op.equals("LSH") || op.equals("RSH") || op.equals("nthroot")) {
+                            expression = formatNumber(op1) + " " + funcName + " " + formatNumber(op2) + " =";
+                        } else if (op.equals("NOT")) {
+                            expression = funcName + "(" + formatNumber(op1) + ") =";
+                        } else {
+                            expression = funcName + "(" + formatNumber(op1) + ") =";
+                        }
                         expressionLabel.setText(expression);
                         updateDisplay();
                         addToHistory(expression + " " + currentInput);
@@ -966,6 +1263,13 @@ public class CalculatorGUI extends Application {
             case "exp" -> "e^x";
             case "sqrt" -> "√";
             case "cbrt" -> "³√";
+            case "nthroot" -> "ⁿ√";
+            case "AND" -> "&";
+            case "OR" -> "|";
+            case "XOR" -> "^";
+            case "NOT" -> "~";
+            case "LSH" -> "<<";
+            case "RSH" -> ">>";
             default -> operator;
         };
     }
@@ -1023,7 +1327,17 @@ public class CalculatorGUI extends Application {
         try {
             double secondOperand = Double.parseDouble(currentInput);
             
-            performCalculation(firstOperand, secondOperand, operator);
+            // Kiểm tra nếu là bitwise operation hoặc advanced operation
+            boolean isAdvanced = operator.equals("AND") || operator.equals("OR") || 
+                                operator.equals("XOR") || operator.equals("LSH") || 
+                                operator.equals("RSH") || operator.equals("nthroot") ||
+                                operator.equals("^") || operator.equals("pow");
+            
+            if (isAdvanced) {
+                performAdvancedCalculation(firstOperand, secondOperand, operator);
+            } else {
+                performCalculation(firstOperand, secondOperand, operator);
+            }
             
             operator = "";
             waitingForOperand = true;

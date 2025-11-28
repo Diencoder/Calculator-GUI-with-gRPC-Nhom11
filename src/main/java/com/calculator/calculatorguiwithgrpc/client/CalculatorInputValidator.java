@@ -29,16 +29,33 @@ public class CalculatorInputValidator {
      * Validate inputs for calculator operations.
      */
     public ValidationResult validateInputs(double operand1, double operand2, String operator) {
+        return validateInputs(operand1, operand2, operator, false);
+    }
+    
+    /**
+     * Validate inputs for calculator operations (basic or advanced).
+     */
+    public ValidationResult validateInputs(double operand1, double operand2, String operator, boolean isAdvanced) {
         StringBuilder errors = new StringBuilder();
 
         // 1. Kiểm tra toán tử
         if (operator == null || operator.trim().isEmpty()) {
             errors.append("Toán tử không được để trống. ");
             logger.debug("Toán tử null hoặc rỗng");
-        } else if (!validationUtils.isValidOperator(operator.trim())) {
-            errors.append("Toán tử không hợp lệ: '").append(operator).append("'. ");
-            errors.append("Các toán tử hợp lệ: +, -, *, /, %, ^. ");
-            logger.debug("Toán tử không hợp lệ: {}", operator);
+        } else {
+            boolean isValidOp = isAdvanced 
+                ? validationUtils.isValidAdvancedOperator(operator.trim())
+                : validationUtils.isValidOperator(operator.trim());
+            
+            if (!isValidOp) {
+                errors.append("Toán tử không hợp lệ: '").append(operator).append("'. ");
+                if (isAdvanced) {
+                    errors.append("Vui lòng sử dụng toán tử nâng cao hợp lệ. ");
+                } else {
+                    errors.append("Các toán tử hợp lệ: +, -, *, /, %, ^. ");
+                }
+                logger.debug("Toán tử không hợp lệ: {}", operator);
+            }
         }
 
         // 2. Kiểm tra số operand1
@@ -54,17 +71,25 @@ public class CalculatorInputValidator {
         }
 
         // 4. Kiểm tra các trường hợp đặc biệt theo toán tử
-        if (operator != null && validationUtils.isValidOperator(operator.trim())) {
-            String operatorError = validateOperatorSpecificCases(operand1, operand2, operator.trim());
-            if (operatorError != null) {
-                errors.append(operatorError).append(" ");
+        if (operator != null) {
+            boolean isValidOp = isAdvanced 
+                ? validationUtils.isValidAdvancedOperator(operator.trim())
+                : validationUtils.isValidOperator(operator.trim());
+            
+            if (isValidOp) {
+                String operatorError = validateOperatorSpecificCases(operand1, operand2, operator.trim(), isAdvanced);
+                if (operatorError != null) {
+                    errors.append(operatorError).append(" ");
+                }
             }
         }
 
-        // 5. Kiểm tra overflow tiềm năng
-        String overflowError = checkPotentialOverflow(operand1, operand2, operator);
-        if (overflowError != null) {
-            errors.append(overflowError).append(" ");
+        // 5. Kiểm tra overflow tiềm năng (chỉ cho basic operators)
+        if (!isAdvanced) {
+            String overflowError = checkPotentialOverflow(operand1, operand2, operator);
+            if (overflowError != null) {
+                errors.append(overflowError).append(" ");
+            }
         }
 
         boolean isValid = errors.length() == 0;
@@ -96,7 +121,7 @@ public class CalculatorInputValidator {
         return null; // Hợp lệ
     }
 
-    private String validateOperatorSpecificCases(double operand1, double operand2, String operator) {
+    private String validateOperatorSpecificCases(double operand1, double operand2, String operator, boolean isAdvanced) {
         switch (operator) {
             case "/":
                 if (operand2 == 0.0) {
@@ -113,6 +138,7 @@ public class CalculatorInputValidator {
                 break;
 
             case "^":
+            case "pow":
                 if (Math.abs(operand2) > maxExponent) {
                     logger.debug("Số mũ quá lớn: {}", operand2);
                     return "Số mũ quá lớn (|" + operand2 + "| > " + maxExponent + ").";
@@ -122,6 +148,54 @@ public class CalculatorInputValidator {
                     return "Không thể tính lũy thừa với cơ số âm và số mũ không nguyên.";
                 }
                 break;
+        }
+        
+        // Advanced operator validations
+        if (isAdvanced) {
+            switch (operator) {
+                case "sqrt":
+                    if (operand1 < 0) {
+                        logger.debug("Căn bậc hai của số âm: {}", operand1);
+                        return "Không thể tính căn bậc hai của số âm.";
+                    }
+                    break;
+                    
+                case "nthroot":
+                    if (operand1 < 0 && operand2 % 2 == 0) {
+                        logger.debug("Căn bậc chẵn của số âm: {} root {}", operand1, operand2);
+                        return "Không thể tính căn bậc chẵn của số âm.";
+                    }
+                    if (operand2 == 0) {
+                        logger.debug("Bậc căn bằng 0");
+                        return "Bậc căn không thể bằng 0.";
+                    }
+                    break;
+                    
+                case "log":
+                case "ln":
+                case "log10":
+                    if (operand1 <= 0) {
+                        logger.debug("Logarit của số không dương: {}", operand1);
+                        return "Không thể tính logarit của số không dương.";
+                    }
+                    break;
+                    
+                case "asin":
+                case "acos":
+                    if (operand1 < -1 || operand1 > 1) {
+                        logger.debug("Arcsin/Arccos ngoài miền [-1, 1]: {}", operand1);
+                        return "Giá trị phải nằm trong khoảng [-1, 1].";
+                    }
+                    break;
+                    
+                case "LSH":
+                case "RSH":
+                    if (operand2 < 0 || operand2 > 63) {
+                        logger.debug("Shift amount không hợp lệ: {}", operand2);
+                        return "Số lượng dịch phải nằm trong khoảng [0, 63].";
+                    }
+                    break;
+            }
         }
 
         return null;

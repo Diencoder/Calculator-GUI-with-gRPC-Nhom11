@@ -24,7 +24,8 @@ public class ValidationUtils {
         "sin", "cos", "tan", "asin", "acos", "atan",
         "sinh", "cosh", "tanh",
         "abs", "ceil", "floor", "round", "max", "min",
-        "convertBase"
+        "convertBase",
+        "AND", "OR", "XOR", "NOT", "LSH", "RSH"
     );
     
     // Pattern for valid numbers (including decimals and scientific notation)

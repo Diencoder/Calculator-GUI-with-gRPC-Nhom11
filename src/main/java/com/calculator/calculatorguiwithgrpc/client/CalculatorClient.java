@@ -3,6 +3,7 @@ package com.calculator.calculatorguiwithgrpc.client;
 import com.calculator.calculatorguiwithgrpc.config.AppConfig;
 import com.calculator.calculatorguiwithgrpc.proto.CalculatorProtos.*;
 import com.calculator.calculatorguiwithgrpc.proto.CalculatorServiceGrpc;
+import com.calculator.calculatorguiwithgrpc.utils.ValidationUtils;
 import io.grpc.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,7 @@ public class CalculatorClient {
     private final String clientId;
     private final CalculatorClientConfig config;
     private final CalculatorInputValidator inputValidator;
+    private final ValidationUtils validationUtils;
     private volatile boolean isShutdown = false;
 
     /**
@@ -51,6 +53,7 @@ public class CalculatorClient {
         this.clientId = UUID.randomUUID().toString().substring(0, 8);
         this.config = config;
         this.inputValidator = new CalculatorInputValidator();
+        this.validationUtils = new ValidationUtils();
         logger.info("[Client-{}] Đang khởi tạo Calculator Client - Host: {}, Port: {}", clientId,
                 config.getHost(), config.getPort());
 
@@ -93,8 +96,12 @@ public class CalculatorClient {
         logger.debug("[Client-{}] Gửi yêu cầu tính toán: {} {} {}", clientId, operand1, operator, operand2);
 
         // Validation chi tiết với thông báo lỗi cụ thể
+        // Kiểm tra xem có phải advanced operator không
+        boolean isAdvanced = validationUtils.isValidAdvancedOperator(operator) && 
+                            !validationUtils.isValidOperator(operator);
+        
         CalculatorInputValidator.ValidationResult validationResult =
-                inputValidator.validateInputs(operand1, operand2, operator);
+                inputValidator.validateInputs(operand1, operand2, operator, isAdvanced);
         if (!validationResult.isValid()) {
             String errorMessage = validationResult.getErrorMessage();
             logger.warn("[Client-{}] Validation thất bại: {} {} {} - Lỗi: {}",

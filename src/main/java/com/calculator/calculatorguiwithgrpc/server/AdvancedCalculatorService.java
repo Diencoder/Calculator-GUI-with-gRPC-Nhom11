@@ -96,7 +96,7 @@ public class AdvancedCalculatorService extends CalculatorServiceGrpc.CalculatorS
             case "sqrt", "cbrt", "exp", "log", "log10", "ln",
                  "sin", "cos", "tan", "asin", "acos", "atan",
                  "sinh", "cosh", "tanh",
-                 "abs", "ceil", "floor", "round" -> true;
+                 "abs", "ceil", "floor", "round", "NOT" -> true;
             default -> false;
         };
     }
@@ -215,6 +215,43 @@ public class AdvancedCalculatorService extends CalculatorServiceGrpc.CalculatorS
             case "round" -> Math.round(operand1);
             case "max" -> Math.max(operand1, operand2);
             case "min" -> Math.min(operand1, operand2);
+            
+            // Bitwise operations (Programmer mode)
+            case "AND" -> {
+                long op1Long = (long) operand1;
+                long op2Long = (long) operand2;
+                yield (double) (op1Long & op2Long);
+            }
+            case "OR" -> {
+                long op1Long = (long) operand1;
+                long op2Long = (long) operand2;
+                yield (double) (op1Long | op2Long);
+            }
+            case "XOR" -> {
+                long op1Long = (long) operand1;
+                long op2Long = (long) operand2;
+                yield (double) (op1Long ^ op2Long);
+            }
+            case "NOT" -> {
+                long op1Long = (long) operand1;
+                yield (double) (~op1Long);
+            }
+            case "LSH" -> {
+                long op1Long = (long) operand1;
+                int shiftAmount = (int) operand2;
+                if (shiftAmount < 0 || shiftAmount > 63) {
+                    throw new ArithmeticException("Shift amount must be between 0 and 63");
+                }
+                yield (double) (op1Long << shiftAmount);
+            }
+            case "RSH" -> {
+                long op1Long = (long) operand1;
+                int shiftAmount = (int) operand2;
+                if (shiftAmount < 0 || shiftAmount > 63) {
+                    throw new ArithmeticException("Shift amount must be between 0 and 63");
+                }
+                yield (double) (op1Long >> shiftAmount);
+            }
             
             default -> throw new IllegalArgumentException("Unsupported advanced operator: " + operator);
         };
