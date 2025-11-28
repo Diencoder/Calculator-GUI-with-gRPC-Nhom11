@@ -64,10 +64,21 @@ public class CalculatorInputValidator {
             errors.append(operand1Error).append(" ");
         }
 
-        // 3. Kiểm tra số operand2
-        String operand2Error = validateOperand(operand2, "Số thứ hai");
-        if (operand2Error != null) {
-            errors.append(operand2Error).append(" ");
+        // 3. Kiểm tra số operand2 (chỉ khi không phải unary operation)
+        boolean isUnaryOperation = isAdvanced && operator != null && 
+            (operator.equals("sqrt") || operator.equals("cbrt") || operator.equals("exp") ||
+             operator.equals("log") || operator.equals("log10") || operator.equals("ln") ||
+             operator.equals("sin") || operator.equals("cos") || operator.equals("tan") ||
+             operator.equals("asin") || operator.equals("acos") || operator.equals("atan") ||
+             operator.equals("sinh") || operator.equals("cosh") || operator.equals("tanh") ||
+             operator.equals("abs") || operator.equals("ceil") || operator.equals("floor") ||
+             operator.equals("round") || operator.equals("NOT"));
+        
+        if (!isUnaryOperation) {
+            String operand2Error = validateOperand(operand2, "Số thứ hai");
+            if (operand2Error != null) {
+                errors.append(operand2Error).append(" ");
+            }
         }
 
         // 4. Kiểm tra các trường hợp đặc biệt theo toán tử

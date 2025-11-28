@@ -443,24 +443,19 @@ public class CalculatorGUI extends Application {
      * Memory Select - Chọn memory slot (0-9)
      */
     private void handleMemorySelect() {
-        TextInputDialog dialog = new TextInputDialog(String.valueOf(currentMemorySlot));
+        // Tạo ChoiceDialog với các lựa chọn 0-9
+        java.util.List<Integer> choices = java.util.Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+        ChoiceDialog<Integer> dialog = new ChoiceDialog<>(currentMemorySlot, choices);
         dialog.setTitle("Chọn Bộ nhớ");
-        dialog.setHeaderText("Nhập số bộ nhớ (0-9):");
+        dialog.setHeaderText("Chọn số bộ nhớ:");
         dialog.setContentText("Bộ nhớ:");
         
-        dialog.showAndWait().ifPresent(input -> {
-            try {
-                int slot = Integer.parseInt(input.trim());
-                if (slot >= 0 && slot <= 9) {
-                    currentMemorySlot = slot;
-                    updateMemoryDisplay();
-                    updateStatus("Đã chọn M" + currentMemorySlot, Color.BLUE);
-                    logger.info("Memory slot selected: M{}", currentMemorySlot);
-                } else {
-                    showError("Lỗi", "Số bộ nhớ phải từ 0 đến 9");
-                }
-            } catch (NumberFormatException e) {
-                showError("Lỗi", "Số không hợp lệ");
+        dialog.showAndWait().ifPresent(slot -> {
+            if (slot != null && slot >= 0 && slot <= 9) {
+                currentMemorySlot = slot;
+                updateMemoryDisplay();
+                updateStatus("Đã chọn M" + currentMemorySlot, Color.BLUE);
+                logger.info("Memory slot selected: M{}", currentMemorySlot);
             }
         });
     }
@@ -869,7 +864,8 @@ public class CalculatorGUI extends Application {
                 break;
             case "(":
             case ")":
-                // Placeholder for future implementation
+                // Parentheses chưa được implement - hiện tại không có chức năng
+                updateStatus("Dấu ngoặc chưa được hỗ trợ", Color.ORANGE);
                 break;
             case "AND":
                 button.setOnAction(e -> handleBitwiseOperation("AND"));
@@ -1102,8 +1098,11 @@ public class CalculatorGUI extends Application {
                 return;
             }
             
-            // Xử lý các hàm một toán hạng
-            String operator = switch (function) {
+            // Xử lý các hàm một toán hạng - Clear operator trước khi gọi unary function
+            operator = "";
+            waitingForOperand = false;
+            
+            String op = switch (function) {
                 case "sin" -> "sin";
                 case "cos" -> "cos";
                 case "tan" -> "tan";
@@ -1122,8 +1121,8 @@ public class CalculatorGUI extends Application {
                 default -> null;
             };
             
-            if (operator != null) {
-                performAdvancedCalculation(value, 0, operator);
+            if (op != null) {
+                performAdvancedCalculation(value, 0, op);
             }
         } catch (NumberFormatException e) {
             showError("Lỗi", "Số không hợp lệ");
@@ -1187,9 +1186,15 @@ public class CalculatorGUI extends Application {
     }
     
     /**
-     * Xử lý nhập hex (A-F)
+     * Xử lý nhập hex (A-F) - Chỉ hoạt động trong Programmer mode với base HEX
      */
     private void handleHexInput(String hex) {
+        // Chỉ cho phép nhập hex trong Programmer mode
+        if (!"Lập trình viên".equals(currentMode)) {
+            updateStatus("Chỉ có thể nhập hex trong chế độ Lập trình viên", Color.ORANGE);
+            return;
+        }
+        
         if (waitingForOperand) {
             currentInput = hex;
             waitingForOperand = false;
@@ -1197,7 +1202,14 @@ public class CalculatorGUI extends Application {
             if (currentInput.equals("0")) {
                 currentInput = hex;
             } else {
-                currentInput += hex;
+                // Kiểm tra nếu currentInput là số hợp lệ trong hex
+                try {
+                    // Thử parse để đảm bảo hợp lệ
+                    Long.parseLong(currentInput + hex, 16);
+                    currentInput += hex;
+                } catch (NumberFormatException e) {
+                    updateStatus("Số hex không hợp lệ", Color.RED);
+                }
             }
         }
         updateDisplay();
@@ -1327,11 +1339,9 @@ public class CalculatorGUI extends Application {
         try {
             double secondOperand = Double.parseDouble(currentInput);
             
-            // Kiểm tra nếu là bitwise operation hoặc advanced operation
-            boolean isAdvanced = operator.equals("AND") || operator.equals("OR") || 
-                                operator.equals("XOR") || operator.equals("LSH") || 
-                                operator.equals("RSH") || operator.equals("nthroot") ||
-                                operator.equals("^") || operator.equals("pow");
+            // Kiểm tra nếu là advanced operation (bao gồm tất cả advanced operators)
+            boolean isAdvanced = validationUtils.isValidAdvancedOperator(operator) && 
+                                !validationUtils.isValidOperator(operator);
             
             if (isAdvanced) {
                 performAdvancedCalculation(firstOperand, secondOperand, operator);
